@@ -1,0 +1,1 @@
+27.34644269033553655.314677482042335116.14658572136133<generator object DataProcess.calculate_mean_variance.<locals>.<genexpr> at 0x7fd68c6db0b0>

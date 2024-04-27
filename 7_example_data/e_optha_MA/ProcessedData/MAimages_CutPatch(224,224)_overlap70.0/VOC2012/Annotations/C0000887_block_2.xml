@@ -1,0 +1,2 @@
+<?xml version='1.0' encoding='utf-8'?>
+<annotation><object><name>MA</name><pose>Unspecified</pose><truncated>0</truncated><difficult>0</difficult><bndbox><xmin>50</xmin><ymin>208</ymin><xmax>61</xmax><ymax>221</ymax></bndbox></object><object><name>MA</name><pose>Unspecified</pose><truncated>0</truncated><difficult>0</difficult><bndbox><xmin>93</xmin><ymin>215</ymin><xmax>104</xmax><ymax>226</ymax></bndbox></object></annotation>
