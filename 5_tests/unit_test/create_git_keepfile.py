@@ -17,8 +17,16 @@ def CreateFiles2Dir(start_path, filename):
         for dir in dirs:
             CreateFile(os.path.join(root, dir), filename)
 
+def DeleteFiles2Dir(start_path, filename):
+    for root, dirs, files in os.walk(start_path):
+        if filename in files:
+            file_path = os.path.join(root, filename)
+            try:
+                os.remove(file_path)
+            except OSError as e:
+                print(f"{e}")
 
 if __name__ == "__main__":
-    start_path = '.'  
+    start_path = '3_configurations/code_configuration/configs'  
     filename = '.keepfile'
-    CreateFiles2Dir(start_path, filename)
+    DeleteFiles2Dir(start_path, filename)
