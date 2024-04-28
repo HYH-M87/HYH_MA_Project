@@ -76,11 +76,11 @@ class DataProcess:
         variances = [v / total_images for v in variances]
         
         with open(info_out,"w+") as f:
-            m = [str(i) for i in means]
-            
-            v = [str(i for i in variances)]
-            f.writelines(m)
-            f.writelines(v)
+            m = [str(i)+"," for i in means]
+            v = [str(i)+"," for i in variances]
+            f.writelines(["mean: "]+m)
+            f.writelines("\n")
+            f.writelines(["variances: "]+v)
         
         return means, variances
     
