@@ -217,7 +217,7 @@ class DataProcess:
             os.makedirs(annotation_block_save_path)
         
         block_size = block
-        step = [int(i*overlap) for i in block]
+        step = [int(i*(1-overlap)) for i in block]
         # step = 80
 
         img_list = [i[:-4]for i in os.listdir(img_dir[0])]
