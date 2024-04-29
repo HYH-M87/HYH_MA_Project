@@ -6,8 +6,8 @@ import argparse
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Predict a batch of image and visualize in Tensorboard')
-    parser.add_argument('img_dir', action='store', help='the directory of .jpg files')
-    parser.add_argument('annotation_dir', action='store', help='the directory of annotation .xml files')
+    parser.add_argument('data_type', action='store', help='the type of dataset',choices=["VOC","COCO"])
+    parser.add_argument('dataset_dir', action='store', help='the top-level directory of dataset ')
     parser.add_argument('model_weight', action='store', help='the path of model weight .pth file')
     parser.add_argument('model_cfg', action='store', help='the path of model cfg .py file')
     parser.add_argument('sample_num', type=int, action='store', help='the number of a images in a batch')
@@ -18,8 +18,8 @@ def parse_args():
 
 def main():
     args = parse_args()
-    eval = ModelEval()
-    eval.predict_batch(args.img_dir, args.annotation_dir, [args.model_cfg,args.model_weight], args.sample_num, args.log_dir)
+    eval = ModelEval(args.data_type)
+    eval.predict_batch(args.dataset_dir, [args.model_cfg,args.model_weight], args.sample_num, args.log_dir)
 
 if __name__ =="__main__":
     main()

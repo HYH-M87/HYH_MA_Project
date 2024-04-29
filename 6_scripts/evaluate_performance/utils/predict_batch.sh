@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-
-IMGDIR=$1
-ANNOTAIONDIR=$2
+DATATYPE=$1
+DATASET=$2
 MODELWEIGHT=$3
 MODELCFG=$4
 SAMPLENUM=$5
@@ -9,8 +8,8 @@ LOGDIR=$6
 
 PYTHONPATH="$(dirname $0)/..":$PYTHONPATH \
 python $(dirname "$0")/../code/predict_batch.py \
-    $IMGDIR \
-    $ANNOTAIONDIR \
+    $DATATYPE \
+    $DATASET \
     $MODELWEIGHT \
     $MODELCFG \
     $SAMPLENUM \
