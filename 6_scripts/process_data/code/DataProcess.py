@@ -296,3 +296,157 @@ class DataProcess:
                     # print(f"Saved block {img_list[index]}_{block_count} as {block_filename}")
                     block_count += 1
         print("-"*10+"image cutting complete"+"-"*10)
+    
+    def image_patch_merge(self, img_dir:tuple, label_dir:tuple, block:list, overlap:float, outnum:int) -> tuple:
+        '''
+        cut the image patch and then merge into a picture. For now it only support to merge 4 patch, whihc means 56*56 patch will generate a image with size (112*112)
+        params:
+                img_dir: dir path of origin images 
+                label_dir: dir path of origin txt annotations defined as ...
+                save_dir: the parent directory of the result composed of two Dirs, images and  annotations_txt
+                block: the image block size 
+                overlap: the overlap index (0~1) 
+                outnum: the number of mix image
+        return: 
+                a tuple contains image block save path and image xml annotations save path
+        '''
+        
+        image_block_save_path = img_dir[1]
+        annotation_block_save_path = label_dir[1]
+        
+        if not os.path.exists(image_block_save_path):
+            os.makedirs(image_block_save_path)
+        if not os.path.exists(annotation_block_save_path):
+            os.makedirs(annotation_block_save_path)
+        
+        block_size = block
+        step = [int(i*(1-overlap)) for i in block]
+        # step = 80
+
+        img_list = [i[:-4]for i in os.listdir(img_dir[0])]
+        img_path = [os.path.join(img_dir[0],i+".jpg") for i in img_list]
+        box_path = [os.path.join(label_dir[0],i+".txt") for i in img_list]
+
+        print("-"*10+"data loading complete"+"-"*10)
+        
+        block_images = []
+        block_names = []
+        block_boxes = []
+        
+        for index in range(len(img_list)):
+            block_count = 0
+            # read the image and load its GT box
+            image = cv2.imread(img_path[index])
+            with open(box_path[index],"r") as f:
+                box_data = np.array(f.readline().split(),dtype=int)
+                box_data = (box_data.reshape((-1,5)))
+                
+            
+            # get the central coordinates for each GTbox
+            box_num = box_data.shape[0]
+            box_centre = np.zeros((box_num,2))
+            for i in range(box_num):
+                box_centre[i] = box_data[i,0:2] + box_data[i,2:4]/2
+
+            height, width, _ = image.shape
+            
+            num_blocks_height = math.ceil((height-block_size[1]) / step[1]) + 1 
+            num_blocks_width = math.ceil((width-block_size[0]) / step[0]) + 1
+
+            for i in range(num_blocks_height):
+                for j in range(num_blocks_width):
+                    
+                    # cut the block from image
+                    y_start = i * step[1]
+                    y_end = int(min(y_start + block_size[1], height))
+                    x_start = j * step[0]
+                    x_end = int(min(x_start + block_size[0], width))
+                    
+                    # if the block exceed the image resolution, then cut it back from the boundary
+                    
+                    if(y_start + block_size[1] > height):
+                        y_start = y_end - block_size[1]
+                    if(x_start + block_size[0] > width):
+                        x_start = x_end - block_size[0]
+                    
+                    block = image[y_start:y_end, x_start:x_end]
+   
+                    
+                    
+                    # select all the block that contain MA
+                    x = np.array([ (x_start<i[0]<x_end) for i in box_centre])
+                    y = np.array([ (y_start<i[1]<y_end) for i in box_centre])
+                    cobj = x*y
+                    if(sum((x*y).astype(int))==0):
+                        continue
+                    
+                    # Coordinate correction
+                    block_data = box_data[cobj]
+                    for bb in block_data:
+                        bb[0] = max(0,bb[0]-x_start)
+                        bb[1] = max(0,bb[1]-y_start)
+                        bb[2] = min(x_end-bb[0],bb[2])
+                        bb[3] = min(y_end-bb[1],bb[3])
+                        
+                    # save block
+                    block_filename = img_list[index] + f"_block_{block_count}"
+                    
+                    block_images.append(block)
+                    block_names.append(block_filename)
+                    
+                    block_data = block_data.flatten()
+                    block_boxes.append(block_data)
+
+                    # print(f"Saved block {img_list[index]}_{block_count} as {block_filename}")
+                    block_count += 1
+                    
+        print("-"*10+"image cutting complete"+"-"*10)
+        
+        if len(block_images) < outnum:
+            k = math.ceil(outnum/len(block_images))
+            block_images *= k
+            block_names *= k
+            block_boxes *= k
+        
+        data_package = list(zip(block_names,block_images,block_boxes))
+        
+        random.seed(42)
+        lt = random.sample(data_package,k=outnum)
+        random.seed(5645)
+        rt = random.sample(data_package,k=outnum)
+        random.seed(782)
+        lb = random.sample(data_package,k=outnum)
+        random.seed(425631)
+        rb = random.sample(data_package,k=outnum)
+        
+        for i in range(outnum):
+            dataname = "mix_image_{}".format(i)
+            
+        
+            res_image = np.zeros((block_size[0]*2,block_size[1]*2,3))
+            # for debug:
+            
+
+            res_image[0:56,0:56,:] = lt[i][1]
+            res_image[0:56,56:112,:] = rt[i][1]
+            res_image[56:112,0:56,:] = lb[i][1]
+            res_image[56:112,56:112,:] = rb[i][1]
+            
+            ltbox = lt[i][2]
+            rtbox = rt[i][2] + np.array([56,0,0,0,0]*int(len(rt[i][2])/5))
+            lbbox = lb[i][2] + np.array([0,56,0,0,0]*int(len(lb[i][2])/5))
+            rbbox = rb[i][2] + np.array([56,56,0,0,0]*int(len(rb[i][2])/5))
+            
+            res_box = np.hstack((ltbox,rtbox,lbbox,rbbox))
+            
+            
+            
+            cv2.imwrite(os.path.join(image_block_save_path,dataname+".jpg"),res_image)
+            
+            with open(os.path.join(annotation_block_save_path,dataname+".txt"),"w+") as f:
+                f.writelines([str(i)+" " for i in res_box ])
+
+if __name__ == "__main__" :
+    
+    
+    pass
