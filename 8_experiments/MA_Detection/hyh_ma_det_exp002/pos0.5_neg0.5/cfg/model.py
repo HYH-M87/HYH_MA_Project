@@ -8,16 +8,17 @@ _base_ = [
 
 
 
-
 # log file and exoeriment info dir
-work_dir = './9_logs/MA_Detection/hyh_ma_det_exp001'
+work_dir = './9_logs/MA_Detection/hyh_ma_det_exp002/pos0.5_neg0.5'
+
+
 
 
 
 conv_cfg = dict(type='ConvWS')  # weight standrized
 norm_cfg = dict(type='GN', num_groups=32, requires_grad=True)  # group norm
-mean=[28.054991813115297,59.027293889389526,125.30599809458327]
-std=[27.24920397138391,96.16559746510993,281.73481789914325]
+mean=[27.89055289996231,58.857601182875676,124.78614245730006]
+std=[30.259294194153544,109.07029260568576,334.6284058025839]
 
 
 
@@ -82,8 +83,8 @@ model = dict(
             _delete_=True,
             type='CenterRegionAssigner',
             # pos_scale=0.2,
-            pos_scale=0.6,
-            neg_scale=0.8,
+            pos_scale=0.5,
+            neg_scale=0.5,
             min_pos_iof=0.01),
         allowed_border=-1,
         pos_weight=-1,
