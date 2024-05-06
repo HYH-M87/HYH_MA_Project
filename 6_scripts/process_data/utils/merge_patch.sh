@@ -6,9 +6,9 @@ PROCESSED_DATA=$3
 PATCH_SIZE_H=$4
 PATCH_SIZE_W=$5
 OVERLAP_RATE=$6
-SPLIT=${7:- -1}
+SPLIT=$7
 PYTHONPATH="$(dirname $0)/..":$PYTHONPATH \
-python $(dirname "$0")/../code/cut_patch_overlap.py \
+python $(dirname "$0")/../code/merge_patch.py \
     $TYPE \
     $ORI_DATA \
     $PROCESSED_DATA \

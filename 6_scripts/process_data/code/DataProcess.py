@@ -168,7 +168,7 @@ class DataProcess:
         '''
         split the Dataset into train dataset and eval dataset
         params:
-                datalist_dir: dir of the data list 
+                datalist_dir: dir of the data image list .jpg files 
                 out_path: save path of the result tx file, a tuple ("trainval.txt","text.txt")
                 k: the proportion of train dataset (0~1)
         return:
@@ -193,7 +193,7 @@ class DataProcess:
         print("-"*10+"dataset split complete"+"-"*10)
         
 
-    def image_cut(self, img_dir:tuple, label_dir:tuple, block:list, overlap:float) -> tuple:
+    def image_cut(self, img_dir:tuple, label_dir:tuple, block:list, overlap:float, split:float=None, split_path:tuple=None) -> tuple:
         '''
         cut the image block that contains target from origin picture
         params:
@@ -202,7 +202,8 @@ class DataProcess:
                 save_dir: the parent directory of the result composed of two Dirs, images and  annotations_txt
                 block: the image block size 
                 overlap: the overlap index (0~1) 
-                creat_xml: creat xml Annotations file 
+                split: the value(0~1),if not none, to split the dataset for train set
+                split_path: the paths to save the dataset txt files; (train.txt,test.txt)
         return: 
                 a tuple contains image block save path and image xml annotations save path
         '''
@@ -219,10 +220,12 @@ class DataProcess:
         block_size = block
         step = [int(i*(1-overlap)) for i in block]
         # step = 80
-
+        
         img_list = [i[:-4]for i in os.listdir(img_dir[0])]
         img_path = [os.path.join(img_dir[0],i+".jpg") for i in img_list]
         box_path = [os.path.join(label_dir[0],i+".txt") for i in img_list]
+        train_list=[]
+        test_list=[]
 
         print("-"*10+"data loading complete"+"-"*10)
         
@@ -263,8 +266,6 @@ class DataProcess:
                         x_start = x_end - block_size[0]
                     
                     block = image[y_start:y_end, x_start:x_end]
-   
-                    
                     
                     # select all the block that contain MA
                     x = np.array([ (x_start<i[0]<x_end) for i in box_centre])
@@ -281,11 +282,13 @@ class DataProcess:
                         bb[2] = min(x_end-bb[0],bb[2])
                         bb[3] = min(y_end-bb[1],bb[3])
 
-                    
-                    
                     # save block
                     block_filename = img_list[index] + f"_block_{block_count}"
-                    
+                    if(split):
+                        if(index<=len(img_list)*split):
+                            train_list.append(block_filename)
+                        else:
+                            test_list.append(block_filename)
                     
                     cv2.imwrite(os.path.join(image_block_save_path,block_filename+".jpg"), block)
                     with open(os.path.join(annotation_block_save_path,block_filename+".txt"),"w") as f:
@@ -295,9 +298,17 @@ class DataProcess:
 
                     # print(f"Saved block {img_list[index]}_{block_count} as {block_filename}")
                     block_count += 1
+        if(split):
+            with open(split_path[0],"w+") as f:
+                for i in train_list:
+                    f.write(i+"\n")
+            with open(split_path[1],"w+") as f:
+                for i in test_list:
+                    f.write(i+"\n")
+                
         print("-"*10+"image cutting complete"+"-"*10)
     
-    def image_patch_merge(self, img_dir:tuple, label_dir:tuple, block:list, overlap:float, outnum:int) -> tuple:
+    def image_patch_merge(self, img_dir:tuple, label_dir:tuple, block:list, overlap:float, split:float, split_path:tuple) -> tuple:
         '''
         cut the image patch and then merge into a picture. For now it only support to merge 4 patch, whihc means 56*56 patch will generate a image with size (112*112)
         params:
@@ -306,7 +317,6 @@ class DataProcess:
                 save_dir: the parent directory of the result composed of two Dirs, images and  annotations_txt
                 block: the image block size 
                 overlap: the overlap index (0~1) 
-                outnum: the number of mix image
         return: 
                 a tuple contains image block save path and image xml annotations save path
         '''
@@ -326,7 +336,8 @@ class DataProcess:
         img_list = [i[:-4]for i in os.listdir(img_dir[0])]
         img_path = [os.path.join(img_dir[0],i+".jpg") for i in img_list]
         box_path = [os.path.join(label_dir[0],i+".txt") for i in img_list]
-
+        train_num = 0
+        
         print("-"*10+"data loading complete"+"-"*10)
         
         block_images = []
@@ -370,8 +381,6 @@ class DataProcess:
                         x_start = x_end - block_size[0]
                     
                     block = image[y_start:y_end, x_start:x_end]
-   
-                    
                     
                     # select all the block that contain MA
                     x = np.array([ (x_start<i[0]<x_end) for i in box_centre])
@@ -391,42 +400,37 @@ class DataProcess:
                     # save block
                     block_filename = img_list[index] + f"_block_{block_count}"
                     
+                    
+                    if(index<=len(img_list)*split):
+                        train_num +=1
+                            
                     block_images.append(block)
                     block_names.append(block_filename)
-                    
                     block_data = block_data.flatten()
                     block_boxes.append(block_data)
-
                     # print(f"Saved block {img_list[index]}_{block_count} as {block_filename}")
                     block_count += 1
                     
         print("-"*10+"image cutting complete"+"-"*10)
         
-        if len(block_images) < outnum:
-            k = math.ceil(outnum/len(block_images))
-            block_images *= k
-            block_names *= k
-            block_boxes *= k
-        
         data_package = list(zip(block_names,block_images,block_boxes))
+        data_list=[]
         
         random.seed(42)
-        lt = random.sample(data_package,k=outnum)
+        lt = random.sample(data_package[0:train_num],k=train_num)
         random.seed(5645)
-        rt = random.sample(data_package,k=outnum)
+        rt = random.sample(data_package[0:train_num],k=train_num)
         random.seed(782)
-        lb = random.sample(data_package,k=outnum)
+        lb = random.sample(data_package[0:train_num],k=train_num)
         random.seed(425631)
-        rb = random.sample(data_package,k=outnum)
+        rb = random.sample(data_package[0:train_num],k=train_num)
         
-        for i in range(outnum):
-            dataname = "mix_image_{}".format(i)
-            
-        
+        index=0
+        for i in range(train_num):
+            dataname = "mix_image_{}".format(index)
+            index +=1
             res_image = np.zeros((block_size[0]*2,block_size[1]*2,3))
-            # for debug:
             
-
             res_image[0:56,0:56,:] = lt[i][1]
             res_image[0:56,56:112,:] = rt[i][1]
             res_image[56:112,0:56,:] = lb[i][1]
@@ -438,15 +442,56 @@ class DataProcess:
             rbbox = rb[i][2] + np.array([56,56,0,0,0]*int(len(rb[i][2])/5))
             
             res_box = np.hstack((ltbox,rtbox,lbbox,rbbox))
-            
-            
+            data_list.append(dataname)
             
             cv2.imwrite(os.path.join(image_block_save_path,dataname+".jpg"),res_image)
             
             with open(os.path.join(annotation_block_save_path,dataname+".txt"),"w+") as f:
                 f.writelines([str(i)+" " for i in res_box ])
-
+        
+        with open(split_path[0],"w+") as f:
+            for i in data_list:
+                f.write(i+"\n")
+        data_list.clear()
+        
+        test_num = len(data_package)-train_num
+        random.seed(42)
+        lt = random.sample(data_package[train_num:],k=test_num)
+        random.seed(5645)
+        rt = random.sample(data_package[train_num:],k=test_num)
+        random.seed(782)
+        lb = random.sample(data_package[train_num:],k=test_num)
+        random.seed(425631)
+        rb = random.sample(data_package[train_num:],k=test_num)
+        
+        for i in range(test_num):
+            dataname = "mix_image_{}".format(index)
+            index +=1
+            res_image = np.zeros((block_size[0]*2,block_size[1]*2,3))
+            
+            res_image[0:56,0:56,:] = lt[i][1]
+            res_image[0:56,56:112,:] = rt[i][1]
+            res_image[56:112,0:56,:] = lb[i][1]
+            res_image[56:112,56:112,:] = rb[i][1]
+            
+            ltbox = lt[i][2]
+            rtbox = rt[i][2] + np.array([56,0,0,0,0]*int(len(rt[i][2])/5))
+            lbbox = lb[i][2] + np.array([0,56,0,0,0]*int(len(lb[i][2])/5))
+            rbbox = rb[i][2] + np.array([56,56,0,0,0]*int(len(rb[i][2])/5))
+            
+            res_box = np.hstack((ltbox,rtbox,lbbox,rbbox))
+            data_list.append(dataname)
+            cv2.imwrite(os.path.join(image_block_save_path,dataname+".jpg"),res_image)
+            
+            with open(os.path.join(annotation_block_save_path,dataname+".txt"),"w+") as f:
+                f.writelines([str(i)+" " for i in res_box ])
+                
+        with open(split_path[1],"w+") as f:
+            for i in data_list:
+                f.write(i+"\n")
+                
 if __name__ == "__main__" :
     
+    tool = DataProcess("VOC")
     
     pass

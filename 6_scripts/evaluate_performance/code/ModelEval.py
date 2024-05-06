@@ -74,12 +74,15 @@ class ModelEval():
             # save the negitive result
             if(len(pred_score)==0 or torch.min(pred_score)<0.7):
                 writer.add_image("Negtive",img,global_step=index,dataformats="HWC")
+                writer.add_text("Negtive",img_file,global_step=index)
                 cv2.imwrite(os.path.join(logdir,"Negtive_Data",img_file),cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
             # visualize the result
             writer.add_image(modelcfg[1], img, global_step=index,dataformats="HWC") 
             writer.add_text(modelcfg[1]+"txt",img_file,global_step=index)
                 
         writer.close()
+        
+    
 
 if __name__ =="__main__":
     # For Debug
