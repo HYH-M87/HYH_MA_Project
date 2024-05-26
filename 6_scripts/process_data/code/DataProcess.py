@@ -56,28 +56,33 @@ class DataProcess:
         
         
         images_list = [os.path.join(img_dir,i) for i in os.listdir(img_dir)]
-        
+        means=np.array([0.,0.,0.])
+        stds = np.array([0.,0.,0.])
         for image_path in images_list:
             image = cv2.imread(image_path)
+            image = cv2.cvtColor(image,cv2.COLOR_BGR2RGB)
+            
             if image is None:
                 print(f"Error: Unable to load image {image_path}")
                 continue
             
             image_float = image.astype(np.float32)
-            
-            mean = np.mean(image_float, axis=(0, 1))
-            variance = np.var(image_float, axis=(0, 1))
-            
-            means = [m + mv for m, mv in zip(means, mean)]
-            variances = [v + vv for v, vv in zip(variances, variance)]
+            mean, std_dev = cv2.meanStdDev(image_float)
+
+            mean = mean.flatten()
+            std_dev = std_dev.flatten()
         
-        total_images = len(os.listdir(img_dir))
-        means = [m / total_images for m in means]
-        variances = [v / total_images for v in variances]
+            means += mean
+            stds += std_dev
+        
+       
+        means /= len(os.listdir(img_dir))
+        stds /= len(os.listdir(img_dir))
+        
         
         with open(info_out,"w+") as f:
             m = [str(i)+"," for i in means]
-            v = [str(i)+"," for i in variances]
+            v = [str(i)+"," for i in stds]
             f.writelines(["mean: "]+m)
             f.writelines("\n")
             f.writelines(["variances: "]+v)
@@ -108,7 +113,7 @@ class DataProcess:
         for t in txt_list:
 
             with open(os.path.join(txt_dir,t), 'r') as f:
-                data_line = np.array(f.readline().split())  
+                data_line = np.array(f.readline().split()).astype(int)  
 
             bboxes = data_line.reshape((-1,5))
 
@@ -193,7 +198,7 @@ class DataProcess:
         print("-"*10+"dataset split complete"+"-"*10)
         
 
-    def image_cut(self, img_dir:tuple, label_dir:tuple, block:list, overlap:float, split:float=None, split_path:tuple=None) -> tuple:
+    def image_cut(self, img_dir:tuple, label_dir:tuple, block:list, overlap:float, split:float=None, split_path:tuple=None, whole=False) -> tuple:
         '''
         cut the image block that contains target from origin picture
         params:
@@ -208,7 +213,7 @@ class DataProcess:
                 a tuple contains image block save path and image xml annotations save path
         '''
 
-
+        value=np.array([  9.29097577, 120.99673151, 100.91605548])
         image_block_save_path = img_dir[1]
         annotation_block_save_path = label_dir[1]
         
@@ -267,15 +272,32 @@ class DataProcess:
                     
                     block = image[y_start:y_end, x_start:x_end]
                     
-                    # select all the block that contain MA
+                    ## adjust hsv
+                    
+                    # block = (block>8).astype(np.uint8)*block
+                    # hsv_block = cv2.cvtColor(block, cv2.COLOR_BGR2HSV)
+                    # image_float = hsv_block.astype(np.float32) 
+                    # mean, std_dev = cv2.meanStdDev(image_float)
+                    # mean = mean.flatten()
+                    
+                    # std_dev = std_dev.flatten()
+                    # adj_value = value - mean
+                    # hsv_block[:,:,2] = cv2.add(hsv_block[:,:,2], adj_value[2])
+                    # block = cv2.cvtColor(hsv_block, cv2.COLOR_HSV2BGR)
+
+                    
+                    # select all the block that contain target
+                    
                     x = np.array([ (x_start<i[0]<x_end) for i in box_centre])
                     y = np.array([ (y_start<i[1]<y_end) for i in box_centre])
                     cobj = x*y
-                    if(sum((x*y).astype(int))==0):
-                        continue
+                    if not whole:
+                        if(sum((x*y).astype(int))==0):
+                            continue
+                    block_data = box_data[cobj]
                     
                     # Coordinate correction
-                    block_data = box_data[cobj]
+                    
                     for bb in block_data:
                         bb[0] = max(0,bb[0]-x_start)
                         bb[1] = max(0,bb[1]-y_start)
@@ -308,7 +330,9 @@ class DataProcess:
                 
         print("-"*10+"image cutting complete"+"-"*10)
     
-    def image_patch_merge(self, img_dir:tuple, label_dir:tuple, block:list, overlap:float, split:float, split_path:tuple) -> tuple:
+
+    def image_patch_merge_witin(self, img_dir:tuple, label_dir:tuple, block_size:list, target_size:list, overlap:float, split:float, split_path:tuple) -> tuple:
+        
         '''
         cut the image patch and then merge into a picture. For now it only support to merge 4 patch, whihc means 56*56 patch will generate a image with size (112*112)
         params:
@@ -320,7 +344,7 @@ class DataProcess:
         return: 
                 a tuple contains image block save path and image xml annotations save path
         '''
-        
+        value=np.array([  9.29097577, 120.99673151, 100.91605548])
         image_block_save_path = img_dir[1]
         annotation_block_save_path = label_dir[1]
         
@@ -329,30 +353,31 @@ class DataProcess:
         if not os.path.exists(annotation_block_save_path):
             os.makedirs(annotation_block_save_path)
         
-        block_size = block
-        step = [int(i*(1-overlap)) for i in block]
+        
+        
+        step = [int(i*(1-overlap)) for i in block_size]
         # step = 80
 
         img_list = [i[:-4]for i in os.listdir(img_dir[0])]
         img_path = [os.path.join(img_dir[0],i+".jpg") for i in img_list]
         box_path = [os.path.join(label_dir[0],i+".txt") for i in img_list]
-        train_num = 0
         
         print("-"*10+"data loading complete"+"-"*10)
         
         block_images = []
         block_names = []
         block_boxes = []
-        
+        train_list=[]
+        test_list=[]
+        merge_id=0
         for index in range(len(img_list)):
             block_count = 0
             # read the image and load its GT box
             image = cv2.imread(img_path[index])
             with open(box_path[index],"r") as f:
                 box_data = np.array(f.readline().split(),dtype=int)
-                box_data = (box_data.reshape((-1,5)))
+                box_data = (box_data.reshape((-1,5)))  #x,y,w,h,class
                 
-            
             # get the central coordinates for each GTbox
             box_num = box_data.shape[0]
             box_centre = np.zeros((box_num,2))
@@ -363,7 +388,7 @@ class DataProcess:
             
             num_blocks_height = math.ceil((height-block_size[1]) / step[1]) + 1 
             num_blocks_width = math.ceil((width-block_size[0]) / step[0]) + 1
-
+            
             for i in range(num_blocks_height):
                 for j in range(num_blocks_width):
                     
@@ -381,6 +406,18 @@ class DataProcess:
                         x_start = x_end - block_size[0]
                     
                     block = image[y_start:y_end, x_start:x_end]
+                    
+                    # block = (block>8).astype(np.uint8)*block
+                    # hsv_block = cv2.cvtColor(block, cv2.COLOR_BGR2HSV)
+                    # image_float = hsv_block.astype(np.float32) 
+                    # mean, std_dev = cv2.meanStdDev(image_float)
+                    # mean = mean.flatten()
+                    # std_dev = std_dev.flatten()
+                    # adj_value = value - mean
+                    # hsv_block[:,:,2] = cv2.add(hsv_block[:,:,2], adj_value[2])
+                    # block = cv2.cvtColor(hsv_block, cv2.COLOR_HSV2BGR)
+                    
+                    
                     
                     # select all the block that contain MA
                     x = np.array([ (x_start<i[0]<x_end) for i in box_centre])
@@ -400,98 +437,70 @@ class DataProcess:
                     # save block
                     block_filename = img_list[index] + f"_block_{block_count}"
                     
-                    
-                    if(index<=len(img_list)*split):
-                        train_num +=1
-                            
                     block_images.append(block)
                     block_names.append(block_filename)
                     block_data = block_data.flatten()
                     block_boxes.append(block_data)
                     # print(f"Saved block {img_list[index]}_{block_count} as {block_filename}")
                     block_count += 1
-                    
+            
+            data_package = list(zip(block_names,block_images,block_boxes))
+
+
+            l = len(data_package)
+            
+            merge_step = int(target_size[0]/block_size[0])
+            patchs_num = merge_step ** 2
+            
+            candidates = []
+    
+                
+            res_image = np.zeros((target_size[0],target_size[1],3))
+            
+            for i in range(patchs_num):
+                random.seed(i*l/patchs_num)
+                candidate_ = random.sample(data_package,k=l)
+                candidates.append(candidate_)
+            
+            data_package.clear()
+            block_images.clear()
+            block_names.clear()
+            block_boxes.clear()
+            
+            for k in range(l):
+                dataname = "mix_image_{}".format(merge_id)
+                merge_id +=1
+                res_boxes = np.array([])
+                for i in range(merge_step):
+                    for j in range(merge_step):
+                        res_image[i*block_size[1]:(i+1)*block_size[1],j*block_size[0]:(j+1)*block_size[0],:] = candidates[i*merge_step+j][k][1]
+                        
+                        box_correct = candidates[i*merge_step+j][k][2] + np.array([j*block_size[0],i*block_size[1],0,0,0]*int(len(candidates[i*merge_step+j][k][2])/5))
+                        res_boxes = np.hstack((res_boxes,box_correct))
+                        
+                if(index<=len(img_list)*split):
+                    train_list.append(dataname)
+                else:
+                    test_list.append(dataname)
+                
+                cv2.imwrite(os.path.join(image_block_save_path,dataname+".jpg"),res_image)
+                
+                with open(os.path.join(annotation_block_save_path,dataname+".txt"),"w+") as f:
+                    f.writelines([str(int(i))+" " for i in res_boxes ])
+            
+        with open(split_path[0],"a+") as f:
+            for i in train_list:
+                f.write(i+"\n")
+        with open(split_path[1],"a+") as f:
+            for i in test_list:
+                f.write(i+"\n")            
+            
+            
         print("-"*10+"image cutting complete"+"-"*10)
         
-        data_package = list(zip(block_names,block_images,block_boxes))
-        data_list=[]
-        
-        random.seed(42)
-        lt = random.sample(data_package[0:train_num],k=train_num)
-        random.seed(5645)
-        rt = random.sample(data_package[0:train_num],k=train_num)
-        random.seed(782)
-        lb = random.sample(data_package[0:train_num],k=train_num)
-        random.seed(425631)
-        rb = random.sample(data_package[0:train_num],k=train_num)
-        
-        index=0
-        for i in range(train_num):
-            dataname = "mix_image_{}".format(index)
-            index +=1
-            res_image = np.zeros((block_size[0]*2,block_size[1]*2,3))
-            
-            res_image[0:56,0:56,:] = lt[i][1]
-            res_image[0:56,56:112,:] = rt[i][1]
-            res_image[56:112,0:56,:] = lb[i][1]
-            res_image[56:112,56:112,:] = rb[i][1]
-            
-            ltbox = lt[i][2]
-            rtbox = rt[i][2] + np.array([56,0,0,0,0]*int(len(rt[i][2])/5))
-            lbbox = lb[i][2] + np.array([0,56,0,0,0]*int(len(lb[i][2])/5))
-            rbbox = rb[i][2] + np.array([56,56,0,0,0]*int(len(rb[i][2])/5))
-            
-            res_box = np.hstack((ltbox,rtbox,lbbox,rbbox))
-            data_list.append(dataname)
-            
-            cv2.imwrite(os.path.join(image_block_save_path,dataname+".jpg"),res_image)
-            
-            with open(os.path.join(annotation_block_save_path,dataname+".txt"),"w+") as f:
-                f.writelines([str(i)+" " for i in res_box ])
-        
-        with open(split_path[0],"w+") as f:
-            for i in data_list:
-                f.write(i+"\n")
-        data_list.clear()
-        
-        test_num = len(data_package)-train_num
-        random.seed(42)
-        lt = random.sample(data_package[train_num:],k=test_num)
-        random.seed(5645)
-        rt = random.sample(data_package[train_num:],k=test_num)
-        random.seed(782)
-        lb = random.sample(data_package[train_num:],k=test_num)
-        random.seed(425631)
-        rb = random.sample(data_package[train_num:],k=test_num)
-        
-        for i in range(test_num):
-            dataname = "mix_image_{}".format(index)
-            index +=1
-            res_image = np.zeros((block_size[0]*2,block_size[1]*2,3))
-            
-            res_image[0:56,0:56,:] = lt[i][1]
-            res_image[0:56,56:112,:] = rt[i][1]
-            res_image[56:112,0:56,:] = lb[i][1]
-            res_image[56:112,56:112,:] = rb[i][1]
-            
-            ltbox = lt[i][2]
-            rtbox = rt[i][2] + np.array([56,0,0,0,0]*int(len(rt[i][2])/5))
-            lbbox = lb[i][2] + np.array([0,56,0,0,0]*int(len(lb[i][2])/5))
-            rbbox = rb[i][2] + np.array([56,56,0,0,0]*int(len(rb[i][2])/5))
-            
-            res_box = np.hstack((ltbox,rtbox,lbbox,rbbox))
-            data_list.append(dataname)
-            cv2.imwrite(os.path.join(image_block_save_path,dataname+".jpg"),res_image)
-            
-            with open(os.path.join(annotation_block_save_path,dataname+".txt"),"w+") as f:
-                f.writelines([str(i)+" " for i in res_box ])
-                
-        with open(split_path[1],"w+") as f:
-            for i in data_list:
-                f.write(i+"\n")
-                
 if __name__ == "__main__" :
     
     tool = DataProcess("VOC")
+    tool.calculate_mean_variance("/home/hyh/Documents/quanyi/project/Data/e_optha_MA/ProcessedData/MAimages_CutPatch(112,112)_overlap50.0/VOC2012/JPEGImages","/home/hyh/Documents/quanyi/project/Data/e_optha_MA/ProcessedData/MAimages_CutPatch(112,112)_overlap50.0/VOC2012/info.txt")
     
     pass

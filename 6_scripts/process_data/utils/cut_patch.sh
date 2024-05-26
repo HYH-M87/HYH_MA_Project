@@ -7,6 +7,7 @@ PATCH_SIZE_H=$4
 PATCH_SIZE_W=$5
 OVERLAP_RATE=$6
 SPLIT=${7:- -1}
+DESCRIPE=${8:-""}
 PYTHONPATH="$(dirname $0)/..":$PYTHONPATH \
 python $(dirname "$0")/../code/cut_patch_overlap.py \
     $TYPE \
@@ -16,3 +17,4 @@ python $(dirname "$0")/../code/cut_patch_overlap.py \
     $PATCH_SIZE_W \
     $OVERLAP_RATE \
     $SPLIT\
+    --descripe $DESCRIPE\
