@@ -8,4 +8,4 @@ _base_ = [
 ]
 
 # log file and exoeriment info dir
-work_dir = './9_logs/MA_Detection/hyh_ma_det_exp006/merge56to112_hrnet'
+work_dir = './9_logs/MA_Detection/hyh_ma_det_exp006/merge56to112_hrnet/finetune'

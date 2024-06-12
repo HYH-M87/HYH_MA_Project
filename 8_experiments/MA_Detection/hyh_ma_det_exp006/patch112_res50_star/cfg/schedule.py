@@ -1,5 +1,5 @@
 # training schedule for 1x
-train_cfg = dict(type='EpochBasedTrainLoop', max_epochs=30, val_interval=1)
+train_cfg = dict(type='EpochBasedTrainLoop', max_epochs=40, val_interval=1)
 val_cfg = dict(type='ValLoop')
 test_cfg = dict(type='TestLoop')
 
@@ -28,4 +28,4 @@ optim_wrapper = dict(
 #   - `base_batch_size` = (8 GPUs) x (2 samples per GPU).
 auto_scale_lr = dict(enable=False, base_batch_size=16)
 
-custom_hooks = [dict(type="UnfreezeBackboneEpochBasedHook", unfreeze_epoch=14)]
+# custom_hooks = [dict(type="UnfreezeBackboneEpochBasedHook", unfreeze_epoch=14)]

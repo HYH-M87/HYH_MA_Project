@@ -2,7 +2,7 @@
 
 # dataset settings
 dataset_type = 'VOCDataset'
-data_root = "../Data/e_optha_MA/ProcessedData/MAimages_CutPatch(112,112)_overlap50.0_nan"
+data_root = "../Data/e_optha_MA/ProcessedData/MAimages_CutPatch(112,112)_overlap50.0_ori"
 
 # Example to use different file client
 # Method 1: simply set the data root and let the file I/O module
@@ -23,14 +23,14 @@ backend_args = None
 train_pipeline = [
     dict(type='LoadImageFromFile', backend_args=backend_args),
     dict(type='LoadAnnotations', with_bbox=True),
-    dict(type='Resize', scale=(224, 224), keep_ratio=True),
+    dict(type='Resize', scale=(224, 224), keep_ratio=True, interpolation="bicubic"),
     dict(type='RandomFlip', prob=0.5),
-    dict(type='RandomHSV',hue_delta=2, saturation_delta= 15, value_delta=50,prob=0.7),
+    dict(type='RandomHSV',hue_delta=2, saturation_delta= 15, value_delta=50,prob=0.6),
     dict(type='PackDetInputs')
 ]
 test_pipeline = [
     dict(type='LoadImageFromFile', backend_args=backend_args),
-    dict(type='Resize', scale=(224, 224), keep_ratio=True),
+    dict(type='Resize', scale=(224, 224), keep_ratio=True, interpolation="bicubic"),
     # avoid bboxes being resized
     dict(type='LoadAnnotations', with_bbox=True),
     dict(
@@ -39,8 +39,7 @@ test_pipeline = [
                    'scale_factor'))
 ]
 train_dataloader = dict(
-    batch_size=32,
-    num_workers=6,
+    batch_size=12,
     persistent_workers=True,
     sampler=dict(type='DefaultSampler', shuffle=True),
     batch_sampler=dict(type='AspectRatioBatchSampler'),

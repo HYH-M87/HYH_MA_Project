@@ -8,9 +8,8 @@ _base_ = [
 
 conv_cfg = dict(type='ConvWS')  # weight standrized
 norm_cfg = dict(type='GN', num_groups=32, requires_grad=True)  # group norm
-mean=[124.78614256005933,58.85760117599803,27.89055291249746]
-std=[11.17362995435,7.290023725838731,4.081536875528884]
-
+mean=[124.71244246624963,58.84973749888887,27.9093589403915]
+std=[11.127219388809989,7.2596578039624875,4.077963818254535]
 
 # model settings
 model = dict(
