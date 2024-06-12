@@ -9,7 +9,7 @@ OVERLAP_RATE=$6
 SPLIT=${7:- -1}
 DESCRIPE=${8:-""}
 PYTHONPATH="$(dirname $0)/..":$PYTHONPATH \
-python $(dirname "$0")/../code/cut_patch_overlap.py \
+python $(dirname "$0")/../cut_patch_overlap.py \
     $TYPE \
     $ORI_DATA \
     $PROCESSED_DATA \

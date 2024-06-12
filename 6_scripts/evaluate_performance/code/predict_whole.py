@@ -14,7 +14,7 @@ def parse_args():
     parser.add_argument('sample_num', type=int, action='store', help='the number of a images in a batch')
     parser.add_argument('score_threshold', type=float, action='store', help='the threshold to screen out the predict box')
     parser.add_argument('iou_threshold', type=float, action='store', help='the threshold to choose the TP predict box')
-    parser.add_argument('description', action='store', help='the description added to the directory name')
+    parser.add_argument('--descripe', action='store', default="", help='the description added to the directory name')
     args = parser.parse_args()
     
     return args
@@ -24,7 +24,7 @@ def main():
     args = parse_args()
     eval = ModelEval(args.data_type)
     healthy=True
-    log_dir = "iou{}_score{}_{}".format(args.iou_threshold, args.score_threshold, args.description)
+    log_dir = "iou{}_score{}_{}".format(args.iou_threshold, args.score_threshold, args.descripe)
     eval.predict_whole(args.dataset_dir, args.exp_dir, args.patch_size, args.overlap_rate, args.sample_num, log_dir ,args.score_threshold,args.iou_threshold)
 
 if __name__ =="__main__":

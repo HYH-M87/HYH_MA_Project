@@ -6,6 +6,10 @@ import random
 import math
 import argparse
 
+# from .._base_ import DataBase_
+
+# class Process(DataBase_):
+#     pass
 
 class DataProcess:
     
@@ -272,18 +276,6 @@ class DataProcess:
                     
                     block = image[y_start:y_end, x_start:x_end]
                     
-                    ## adjust hsv
-                    
-                    # block = (block>8).astype(np.uint8)*block
-                    # hsv_block = cv2.cvtColor(block, cv2.COLOR_BGR2HSV)
-                    # image_float = hsv_block.astype(np.float32) 
-                    # mean, std_dev = cv2.meanStdDev(image_float)
-                    # mean = mean.flatten()
-                    
-                    # std_dev = std_dev.flatten()
-                    # adj_value = value - mean
-                    # hsv_block[:,:,2] = cv2.add(hsv_block[:,:,2], adj_value[2])
-                    # block = cv2.cvtColor(hsv_block, cv2.COLOR_HSV2BGR)
 
                     
                     # select all the block that contain target
@@ -500,7 +492,7 @@ class DataProcess:
         
 if __name__ == "__main__" :
     
-    tool = DataProcess("VOC")
-    tool.calculate_mean_variance("/home/hyh/Documents/quanyi/project/Data/e_optha_MA/ProcessedData/MAimages_CutPatch(112,112)_overlap50.0/VOC2012/JPEGImages","/home/hyh/Documents/quanyi/project/Data/e_optha_MA/ProcessedData/MAimages_CutPatch(112,112)_overlap50.0/VOC2012/info.txt")
+    # tool = DataProcess("VOC")
+    # tool.calculate_mean_variance("/home/hyh/Documents/quanyi/project/Data/e_optha_MA/ProcessedData/MAimages_CutPatch(112,112)_overlap50.0/VOC2012/JPEGImages","/home/hyh/Documents/quanyi/project/Data/e_optha_MA/ProcessedData/MAimages_CutPatch(112,112)_overlap50.0/VOC2012/info.txt")
     
     pass

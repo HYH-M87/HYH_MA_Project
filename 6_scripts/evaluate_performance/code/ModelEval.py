@@ -113,6 +113,7 @@ class ModelEval():
         else:
             samplenum = len(img_list)
         
+        # the metrics based on bbox, patch, image level respectively
         bbox_metric =  np.array([0,0,0,0,0,0,0]).astype(float) #(TP.FP.TM.FN,Recall,Ap,SP)
         patch_metric =  np.array([0,0,0,0,0,0,0]).astype(float)
         image_metric = np.array([0,0,0,0,0,0,0]).astype(float)
@@ -121,6 +122,7 @@ class ModelEval():
         ma_image = 0
         model = init_detector(modelcfg[0],modelcfg[1])
         
+        # model inference for every image 
         for id,img in enumerate(img_list):
             print(f"all: {samplenum};  now:{id}")
             Ori_image = cv2.imread(os.path.join(img_dir,img+".jpg"))
@@ -150,7 +152,9 @@ class ModelEval():
             patch_metric_ = np.array([0,0,0,0,0,0,0]).astype(float)
             
             pred_boxes=[]
-            
+            hard_sample=[]
+            hard_sample_iou=[]
+            # the number of patch/block/'s GT is positive or negitive
             P_block=0.
             N_block=0.
             
@@ -166,15 +170,17 @@ class ModelEval():
 
                     block = image[y_start:y_end, x_start:x_end,:]
 
+                    # discard the background area
                     if (block.flatten()<15).astype(int).sum()/len(block.flatten()) > 0.85:
                         continue
                     else:
-
+                        # model inference
                         result = inference_detector(model,block)
                         pred_label = (result.pred_instances.labels).cpu().numpy()
                         pred_box = (result.pred_instances.bboxes).cpu().numpy().astype(np.uint32)
                         pred_score = (result.pred_instances.scores).cpu().numpy()
                         pred_box = pred_box[pred_score>score_ther] + np.array([x_start,y_start]*2).astype(np.uint32)
+                        # get the GT box in current area
                         masked_gt = []
                         if not healthy:
                             masked_gt = bboxes[self.contain_(bboxes,[x_start,y_start,x_end,y_end])]
@@ -188,36 +194,38 @@ class ModelEval():
                             if len(pred_score) == 0:
                                 patch_metric_[2] += 1
                             else:
-                                if np.max(pred_score.flatten()) < 0.2:
-                                    patch_metric_[2] += 1
-                                else:
-                                    patch_metric_[1] += 1
+                                # if np.max(pred_score.flatten()) < 0.2:
+                                #     patch_metric_[2] += 1
+                                # else:
+                                patch_metric_[1] += 1
                             continue
                         
                         P_block += 1.
                         if not healthy:
                             gtnum = len(masked_gt)
-                            metric_[0:4], match_gt = self.fp_tp_bbox(masked_gt,pred_box,iou_ther)
-                        
+                            metric_[0:4], hard_sample_,hiou_ = self.fp_tp_bbox(masked_gt,pred_box,iou_ther)
+                            hard_sample += hard_sample_
+                            hard_sample_iou += hiou_
+                            match_gt = gtnum-len(hard_sample_)
                             if metric_[0] != 0:
                                 patch_metric_[0] += 1
                             else:
                                 patch_metric_[3] += 1
                         
-                        metric_[4] = match_gt/(gtnum+1e-9)
+                        metric_[4] = match_gt/(gtnum+1e-9)  
                         metric_[5] = metric_[0]/(metric_[0]+metric_[1]+1e-9)
                         
                         bbox_metric_ += metric_
                         # print(f"block{num_block}  Recall={recall}  mAP={ap}  [TP,FP,TN,FN]={metric} gtnum={gtnum}  matchgt={match_gt}")
                     
             # for image
-            bbox_metric_[4] = bbox_metric_[4] / P_block+1e-9
+            bbox_metric_[4] = bbox_metric_[4] / (P_block+1e-9)
             bbox_metric_[5] = bbox_metric_[0] / (bbox_metric_[0]+bbox_metric_[1]+1e-9)
             bbox_metric += bbox_metric_
             
-            patch_metric_[4] = patch_metric_[0] / P_block+1e-9
+            patch_metric_[4] = patch_metric_[0] / (P_block+1e-9)
             patch_metric_[5] = patch_metric_[0] / (patch_metric_[0]+patch_metric_[1]+1e-9)
-            patch_metric_[6] = patch_metric_[2] / N_block+1e-9
+            patch_metric_[6] = patch_metric_[2] / (P_block+N_block+1e-9)
             patch_metric += patch_metric_
             
             if healthy:
@@ -238,18 +246,29 @@ class ModelEval():
             offset=3
             for bbox in pred_boxes:
                 x1, y1, x2, y2 = map(int, bbox)
-                Ori_image = cv2.rectangle(Ori_image,(x1-offset,y1-offset),(x2+offset,y2+offset),(255,255,0),1)
-                
+                cv2.rectangle(Ori_image,(x1-offset,y1-offset),(x2+offset,y2+offset),(255,255,0),1)
+            hard_sample_iou=np.array(hard_sample_iou)
+            
             for bbox in bboxes:
                 x1, y1, x2, y2, index= map(int, bbox)
-                Ori_image = cv2.rectangle(Ori_image,(x1-offset,y1-offset),(x2+offset,y2+offset),(0,0,0),1)
+                flag = (bbox==hard_sample).all(axis=1) if len(hard_sample)!=0 else [False]
+                if np.any(flag):
+                    cv2.rectangle(Ori_image,(x1-offset,y1-offset),(x2+offset,y2+offset),(255,12,215),1)
+                    cv2.putText(Ori_image,f"iou:{round(hard_sample_iou[flag][0],2)}",(x2+10,y2+10),cv2.FONT_HERSHEY_SIMPLEX,1,(255, 255, 255),1)
+                else:
+                    cv2.rectangle(Ori_image,(x1-offset,y1-offset),(x2+offset,y2+offset),(0,0,0),1)
+                    
+                cv2.rectangle(Ori_image,(x1-10,y1-10),(x2+10,y2+10),(255,0,0),2)
+
             # image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
             
             if save is not None:
     
                 if not os.path.exists(os.path.join(exp_dir,save)):
                     os.makedirs(os.path.join(exp_dir,save))
-                        
+                if not os.path.exists(os.path.join(exp_dir,save,"hard sample")):
+                    os.makedirs(os.path.join(exp_dir,save,"hard sample"))
+                    
                 save_path = os.path.join(exp_dir,save,"pred_"+img+".jpg")
                 cv2.imwrite(save_path,Ori_image)
                 # with open(os.path.join(exp_dir,save,"eval.txt"),"w") as f:
@@ -263,6 +282,11 @@ class ModelEval():
                     f.write(f"Bbox Based------------\n   Recall={round(bbox_metric_[4],3)}  mAP={round(bbox_metric_[5],3)} [TP,FP,TN,FN]={bbox_metric_[0:4].astype(int)}\n")
                     f.write(f"Patch Based-----------\n   Recall={round(patch_metric_[4],3)}  mAP={round(patch_metric_[5],3)}  SP={patch_metric_[6]}  [TP,FP,TN,FN]={patch_metric_[0:4].astype(int)}\n")
                     f.write("Image Based-----------\n   GT={}  Pred={}\n".format("healthy" if healthy else "MA",img_pt))
+                    
+                with open(os.path.join(exp_dir,save,"hard sample",f"{img}.txt"),"a+") as f:
+                    for bbox in hard_sample:
+                        x1, y1, x2, y2, index= map(int, bbox)
+                        f.write(f"{x1} {y1} {x2} {y2} {index} ")
             # print(f"img:{img}  all block={N_block+P_block}")
             # print("bbox based------------")
             # print(f"Recall={bbox_metric_[4]}  mAP={bbox_metric_[5]} [TP,FP,TN,FN]={bbox_metric_[0:4]}")
@@ -333,44 +357,46 @@ class ModelEval():
         TP = 0
         FP = 0
         TN = 0
-        gt_matched = 0
+        hard_sample = []
+        hard_sample_iou = []
         for gtbox in GT:
             pl = Pred.shape[0]
             gtboxs = np.tile(gtbox, (pl, 1))
             iou = self.IOU(gtboxs,Pred)
             Nmatch_mask = (iou < iou_ther)
             TP += np.sum((iou >= iou_ther).astype(int))
-            if(np.sum((iou >= iou_ther).astype(int))!=0):
-                gt_matched += 1
+            if(np.sum((iou >= iou_ther).astype(int))==0):
+                hard_sample.append(gtbox)
+                hard_sample_iou.append(np.max(iou) if len(iou)>0 else 0)
                 
             Pred = Pred[Nmatch_mask]
             
         FP = Pred.shape[0]
-        FN = GT.shape[0] - gt_matched
+        FN = len(hard_sample)
         # return [TP,FP,TN,FN]
-        return [TP,FP,TN,FN],gt_matched
+        return [TP,FP,TN,FN],hard_sample,hard_sample_iou
     
-    def fp_tp_(self,GT:np.array,Pred:np.array):
-        TP = 0
-        FP = 0
-        TN = 0
-        iou_threshold = 0.5
-        gt_matched = 0
-        for gtbox in GT:
-            pl = Pred.shape[0]
-            gtboxs = np.tile(gtbox, (pl, 1))
-            iou = self.IOU(gtboxs,Pred)
-            Nmatch_mask = (iou < iou_threshold)
-            TP += np.sum((iou >= iou_threshold).astype(int))
-            if(np.sum((iou >= iou_threshold).astype(int))!=0):
-                gt_matched += 1
+    # def fp_tp_(self,GT:np.array,Pred:np.array):
+    #     TP = 0
+    #     FP = 0
+    #     TN = 0
+    #     iou_threshold = 0.5
+    #     gt_matched = 0
+    #     for gtbox in GT:
+    #         pl = Pred.shape[0]
+    #         gtboxs = np.tile(gtbox, (pl, 1))
+    #         iou = self.IOU(gtboxs,Pred)
+    #         Nmatch_mask = (iou < iou_threshold)
+    #         TP += np.sum((iou >= iou_threshold).astype(int))
+    #         if(np.sum((iou >= iou_threshold).astype(int))!=0):
+    #             gt_matched += 1
                 
-            Pred = Pred[Nmatch_mask]
+    #         Pred = Pred[Nmatch_mask]
             
-        FP = Pred.shape[0]
-        FN = GT.shape[0] - gt_matched
-        # return [TP,FP,TN,FN]
-        return [TP,FP,TN,FN],gt_matched
+    #     FP = Pred.shape[0]
+    #     FN = GT.shape[0] - gt_matched
+    #     # return [TP,FP,TN,FN]
+    #     return [TP,FP,TN,FN],gt_matched
     
     def recall(metric):
         pass
@@ -394,11 +420,10 @@ if __name__ =="__main__":
         
     # For Debug 
     # TODO: wait for test
-    
-    # Ori_dir = "../Data/e_optha_MA/MA"
-    # Process_dir = "../Data/e_optha_MA/MA"
-    # # log_dir = 
-    # model = ["9_logs/MA_Detection/hyh_ma_det_exp007/res50_56to112_with_healthy/20240518_112306/vis_data/config.py","9_logs/MA_Detection/hyh_ma_det_exp007/res50_56to112_with_healthy/epoch_46.pth"]
-    # eval = ModelEval("VOC")
-    # eval.predict_whole([Ori_dir,Process_dir], model,[112,112], 0, None,"9_logs/MA_Detection/hyh_ma_det_exp007/test_img")
-    pass
+    s=0.2
+    i=0.2
+    tool = ModelEval("VOC")
+    data="../Data/e_optha_MA/MA"
+    exp="9_logs/MA_Detection/hyh_ma_det_exp005/merge56to112_res50/pretrain"
+    save=f"score{s}_iou{i}"
+    tool.predict_whole(data,exp,[112,112],0.1,-1,save,s,i)

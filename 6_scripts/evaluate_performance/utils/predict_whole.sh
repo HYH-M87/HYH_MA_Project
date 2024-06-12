@@ -20,4 +20,4 @@ python $(dirname "$0")/../code/predict_whole.py \
     $SAMPLENUM \
     $SCORE_THRE \
     $IOU_THRE \
-    $DESCRIPE \
+    --descripe $DESCRIPE \

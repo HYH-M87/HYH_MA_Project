@@ -9,7 +9,7 @@ OVERLAP_RATE=$6
 SPLIT=$7
 DESCRIPE=${8:-""}
 PYTHONPATH="$(dirname $0)/..":$PYTHONPATH \
-python $(dirname "$0")/../code/merge_patch.py \
+python $(dirname "$0")/../merge_patch.py \
     $TYPE \
     $ORI_DATA \
     $PROCESSED_DATA \
