@@ -1,5 +1,5 @@
 [submodule "4_dependencies/libraries/mmdetection"]
-	path = 4_dependencies/libraries/mmdetection
+	path = dependencies/libraries/mmdetection
 	url = https://github.com/HYH-M87/mmdetection.git
 [submodule "4_dependencies/libraries/ultralytics"]
 	path = 4_dependencies/libraries/ultralytics
