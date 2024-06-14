@@ -9,11 +9,16 @@ from PIL import Image
 import math
 import random
 
-
+class Metric():
+    def __init__(self) -> None:
+        
+        pass
+    
 
 class ModelEval():
     
     def __init__(self, Type) -> None:
+        
         self.Type = Type
         if Type=="VOC":
             self.Image_Path = "VOC2012/JPEGImages"
@@ -24,6 +29,40 @@ class ModelEval():
             self.Info = "VOC2012/info.txt"
             self.Annotation_Txt = "VOC2012/Annotations_Txt"
         
+    def _init_predictor(self):
+        '''
+        初始化 模型，导入数据和标签，创建所需指标
+        '''
+        pass
+        
+    def _patch(self, patch):
+        '''
+        输入patch，进行预测，统计基于bbox的指标并更新
+        
+        '''
+        
+        pass
+    
+    def _image(self, image):
+        '''
+        
+        '''
+        pass
+    
+    def predict(self, dataset, model_cfg, samplenum, log):
+        
+        # load data
+        
+        # build model
+        
+        # create metric saver
+        
+        ## predict loop
+            # predict a image
+            # m,c = self._image()
+        
+        pass
+    
     
     def predict_patch(self, datasetdir:str, modelcfg:tuple, samplenum:int, logdir:str):
         '''
@@ -87,6 +126,14 @@ class ModelEval():
     
     
     def predict_whole(self, datasetdir:tuple,  exp_dir:str, block_size:list, overlap:int, samplenum:int=-1, save:str=None, score_ther:float=0.3, iou_ther:float=0.5):
+        '''
+        1. 读入图像和标签
+        2. 切片
+        3. 预测
+        4. 计算指标
+        5. 保存
+        
+        '''
 
         assert os.path.exists(os.path.join(exp_dir,"latest","vis_data","config.py"))
         assert os.path.exists(os.path.join(exp_dir,"last_checkpoint"))
