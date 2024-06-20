@@ -4,7 +4,3 @@
 [submodule "4_dependencies/libraries/ultralytics"]
 	path = 4_dependencies/libraries/ultralytics
 	url = https://github.com/HYH-M87/ultralytics.git
-[submodule "dependencies/libraries/mmsegmentation"]
-	path = dependencies/libraries/mmsegmentation
-	url = https://github.com/open-mmlab/mmsegmentation.git
-	branch = main
