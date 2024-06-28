@@ -13,45 +13,50 @@ from mlp.dataset import MA_patch
 from mlp.model import MLP
 
 # 超参数
-input_size = 3 * 24 * 24  
+input_size = [56,56]
 output_size = 2  
-learning_rate = 0.001
+learning_rate = 0.0001
 num_epochs = 300
 batch_size = 32
-
-log_dir = "logs/MA_Detection/mlp_cls_test"
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+log_dir = "logs/MA_Detection/mlp_cls/exp1"
 if not os.path.exists(log_dir):
     os.makedirs(log_dir)
     
 log_path = os.path.join(log_dir,'log.txt')
-checkpoint = os.path.join(log_dir,'final_model.pth')
 writer = SummaryWriter(log_dir=os.path.join(log_dir,'tf'))
 
 # 数据预处理和加载
 transform = transforms.Compose([
-    transforms.ToTensor(),
-    transforms.Normalize((0.1307,), (0.3081,))
+    transforms.ToTensor()
 ])
 
-train_dataset = MA_patch("/home/hyh/Documents/quanyi/project/Data/e_optha_MA/extract_sample",True,transform)
-test_dataset = MA_patch("/home/hyh/Documents/quanyi/project/Data/e_optha_MA/extract_sample",False,transform)
+data_dir = '/home/hyh/Documents/quanyi/project/Data/e_optha_MA/extract_sample'
+train_dataset = MA_patch(data_dir,True,transform)
+test_dataset = MA_patch(data_dir,False,transform)
 train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
 test_loader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False)
 
 model = MLP(input_size, output_size)
+start=0
+checkpoint="logs/MA_Detection/mlp_cls/exp1/epoch_129.pth"
+if os.path.exists(checkpoint):
+    model.load_state_dict(torch.load(checkpoint))
+    start = int(os.path.split(checkpoint)[-1][6:-4])+1
+model.to(device)
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9, weight_decay=0.0001)
 
 
 
 # model.load_state_dict(checkpoint)
-for epoch in range(num_epochs):
+for epoch in range(start, num_epochs):
     tl=0
     sl=0
     for i, (item_info) in enumerate(train_loader):
 
         images,labels = item_info['image'], item_info['label']
-        
+        images,labels = images.to(device), labels.to(device)
         outputs = model(images)
         loss = criterion(outputs, labels)
         tl += loss.item()
@@ -79,10 +84,12 @@ for epoch in range(num_epochs):
         gt_total = 0
         tp_total = 0
         for item_info in test_loader:
-            images,labels = item_info['image'], item_info['label']
+            images, labels = item_info['image'], item_info['label']
+            images, labels = images.to(device), labels.to(device)
             label = torch.max(labels.data, 1)[1]
             gt_total += (label==0).sum().item()
             outputs = model(images)
+            # outputs.to()
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
             correct += (predicted == torch.max(labels.data, 1)[1]).sum().item()

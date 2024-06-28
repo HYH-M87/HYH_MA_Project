@@ -1,0 +1,1 @@
+{"source": "DS000E6N.jpg", "name": "DS000E6N_block_26", "annotation": {"type": "LTRBxyxy", "gt": [], "pred": [[88, 80, 94, 88], [105, 42, 111, 50]], "hard_sample": null, "score": [0.5705185532569885, 0.4775564670562744, 0.4768984913825989], "label": [0, 0, 0], "iou": null, "offset": [900, 300, 900, 300]}, "classes": [], "image": [112, 112], "numerical": null}

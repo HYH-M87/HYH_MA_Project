@@ -1,0 +1,1 @@
+{"source": "C0030737.jpg", "name": "C0030737_block_142", "annotation": {"type": "LTRBxyxy", "gt": [], "pred": [[4, 104, 12, 111]], "hard_sample": null, "score": [0.5735432505607605], "label": [0], "iou": null, "offset": [1400, 900, 1400, 900]}, "classes": [], "image": [112, 112], "numerical": null}

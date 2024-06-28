@@ -16,7 +16,7 @@ class StarBlock(nn.Module):
         super().__init__()
         self.f1 = ConvBn(inplanes, inplanes*mlp_ratio, 1, with_bn=False)
         self.f2 = ConvBn(inplanes, inplanes*mlp_ratio, 1, with_bn=False)
-        self.g = ConvBn(mlp_ratio * inplanes, inplanes, 1, with_bn=True)
+        self.g = ConvBn(mlp_ratio * inplanes, outplanes, 1, with_bn=True)
         self.act = nn.ReLU6()
     
     def forward(self, x):

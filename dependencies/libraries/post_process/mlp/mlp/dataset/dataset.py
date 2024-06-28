@@ -38,12 +38,12 @@ class MA_patch(Dataset):
             raise FileNotFoundError(f"Annotation file not found for image: {image_path}")
         with open(txt_path,"r") as f:
             data = f.read().split()
-        label = torch.tensor([1,0],dtype=torch.float32) if int(data[0])==0 else torch.tensor([0,1],dtype=torch.float32)
+        label = torch.tensor([1,0],dtype=torch.float32) if int(data[-1])==0 else torch.tensor([0,1],dtype=torch.float32)
         
         item_info = {
             'image':image,
             'label':label,
-            'file':file
+            'file':file,
         }
         
         return item_info

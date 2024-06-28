@@ -9,16 +9,18 @@ import torch.nn as nn
 class MLP(nn.Module):
     def __init__(self, input_size, output_size):
         super(MLP, self).__init__()
-        self.ef1 = nn.Sequential( nn.Conv2d(3,32,3),nn.BatchNorm2d(32), nn.ReLU())
-        self.ef2 = nn.Sequential( nn.Conv2d(32,32,3),nn.BatchNorm2d(32), nn.ReLU())
-        self.ef3 = nn.Sequential( nn.Conv2d(32,3,3),nn.BatchNorm2d(3), nn.ReLU())
-        self.ef4 = nn.Sequential( nn.Conv2d(32,3,3),nn.BatchNorm2d(3), nn.ReLU())
+        self.ef1 = nn.Sequential( nn.Conv2d(3,32,3,padding=1),nn.BatchNorm2d(32), nn.ReLU())
+        self.ef2 = nn.Sequential( nn.Conv2d(32,32,3,padding=1,stride=2),nn.BatchNorm2d(32), nn.ReLU())
+        self.ef3 = nn.Sequential( nn.Conv2d(32,3,3,padding=1),nn.BatchNorm2d(3), nn.ReLU())
+        self.ef4 = nn.Sequential( nn.Conv2d(32,3,3,padding=1),nn.BatchNorm2d(3), nn.ReLU())
         self.pool1 = nn.AvgPool2d(2,2)
         
-        self.fc1 = nn.Linear(1215, 1215*2)
+        h,w = input_size
+        fc_inplanes = h//2 * w//2 * 3 * 2
+        self.fc1 = nn.Linear(fc_inplanes, fc_inplanes*2)
         self.relu = nn.ReLU()
-        self.fc2 = nn.Linear(1215, 1215*2)
-        self.fc3 = nn.Linear(1215*2, 512)
+        self.fc2 = nn.Linear(fc_inplanes, fc_inplanes*2)
+        self.fc3 = nn.Linear(fc_inplanes*2, 512)
         self.fc4 = nn.Linear(512, 2)
         self.sigmoid = nn.Sigmoid()
         self._initialize_weights()
@@ -38,7 +40,7 @@ class MLP(nn.Module):
         out_y = self.pool1(out)
         out = self.ef2(out)
         out = self.ef3(out)
-        out_y = self.ef4(out_y)  #b*(3*12*12)
+        out_y = self.ef4(out_y)  #b*(3*12*12)        
         out = out.view((out.shape[0],-1))  #b*(3*24*24)
         out_y = out_y.view((out_y.shape[0],-1))
         out = torch.cat((out,out_y),dim=1)

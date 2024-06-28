@@ -1,0 +1,1 @@
+{"source": "DS000FGF.jpg", "name": "DS000FGF_block_19", "annotation": {"type": "LTRBxyxy", "gt": [], "pred": [[12, 95, 20, 102]], "hard_sample": null, "score": [0.8934804201126099], "label": [0], "iou": null, "offset": [1100, 200, 1100, 200]}, "classes": [], "image": [112, 112], "numerical": null}

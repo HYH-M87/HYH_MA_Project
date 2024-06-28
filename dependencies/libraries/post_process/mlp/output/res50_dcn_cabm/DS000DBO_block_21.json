@@ -1,0 +1,1 @@
+{"source": "DS000DBO.jpg", "name": "DS000DBO_block_21", "annotation": {"type": "LTRBxyxy", "gt": [[82, 8, 89, 17, 0]], "pred": [[80, 7, 87, 13], [23, 103, 30, 110]], "hard_sample": [], "score": [0.9466205835342407, 0.4443037807941437], "label": [0, 0], "iou": [[0.3125, 0.0], [0.0, -1.0]], "offset": [400, 300, 400, 300]}, "classes": [0], "image": [112, 112], "numerical": null}

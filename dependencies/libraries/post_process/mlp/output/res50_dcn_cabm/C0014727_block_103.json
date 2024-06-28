@@ -1,0 +1,1 @@
+{"source": "C0014727.jpg", "name": "C0014727_block_103", "annotation": {"type": "LTRBxyxy", "gt": [], "pred": [[56, 65, 74, 83], [92, 0, 109, 17]], "hard_sample": null, "score": [0.7873512506484985, 0.6473510265350342], "label": [0, 0], "iou": null, "offset": [900, 600, 900, 600]}, "classes": [], "image": [112, 112], "numerical": null}

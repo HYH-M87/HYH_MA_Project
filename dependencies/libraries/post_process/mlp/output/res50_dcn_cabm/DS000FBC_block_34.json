@@ -1,0 +1,1 @@
+{"source": "DS000FBC.jpg", "name": "DS000FBC_block_34", "annotation": {"type": "LTRBxyxy", "gt": [], "pred": [[24, 68, 35, 80]], "hard_sample": null, "score": [0.48022985458374023], "label": [0], "iou": null, "offset": [700, 400, 700, 400]}, "classes": [], "image": [112, 112], "numerical": null}

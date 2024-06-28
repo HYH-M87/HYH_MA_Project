@@ -1,0 +1,1 @@
+{"source": "DS000HVG.jpg", "name": "DS000HVG_block_19", "annotation": {"type": "LTRBxyxy", "gt": [], "pred": [[30, 100, 40, 109]], "hard_sample": null, "score": [0.7170335650444031, 0.4664425849914551], "label": [0, 0], "iou": null, "offset": [1100, 200, 1100, 200]}, "classes": [], "image": [112, 112], "numerical": null}

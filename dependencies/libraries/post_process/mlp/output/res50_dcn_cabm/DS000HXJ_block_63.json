@@ -1,0 +1,1 @@
+{"source": "DS000HXJ.jpg", "name": "DS000HXJ_block_63", "annotation": {"type": "LTRBxyxy", "gt": [], "pred": [[55, 37, 62, 45]], "hard_sample": null, "score": [0.7919213771820068, 0.45192843675613403], "label": [0, 0], "iou": null, "offset": [800, 700, 800, 700]}, "classes": [], "image": [112, 112], "numerical": null}

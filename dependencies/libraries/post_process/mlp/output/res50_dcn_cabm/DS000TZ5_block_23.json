@@ -1,0 +1,1 @@
+{"source": "DS000TZ5.jpg", "name": "DS000TZ5_block_23", "annotation": {"type": "LTRBxyxy", "gt": [], "pred": [[101, 76, 111, 87]], "hard_sample": null, "score": [0.6245580911636353], "label": [0], "iou": null, "offset": [700, 300, 700, 300]}, "classes": [], "image": [112, 112], "numerical": null}
