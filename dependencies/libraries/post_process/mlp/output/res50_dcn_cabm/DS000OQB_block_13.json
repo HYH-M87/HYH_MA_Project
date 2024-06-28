@@ -1,1 +1,0 @@
-{"source": "DS000OQB.jpg", "name": "DS000OQB_block_13", "annotation": {"type": "LTRBxyxy", "gt": [], "pred": [[24, 76, 32, 85], [81, 20, 86, 26], [105, 71, 111, 81]], "hard_sample": null, "score": [0.6180033683776855, 0.421037495136261, 0.4048057496547699], "label": [0, 0, 0], "iou": null, "offset": [500, 200, 500, 200]}, "classes": [], "image": [112, 112], "numerical": null}

@@ -1,1 +1,0 @@
-{"source": "C0024251.jpg", "name": "C0024251_block_281", "annotation": {"type": "LTRBxyxy", "gt": [], "pred": [[85, 0, 93, 10], [98, 12, 105, 20]], "hard_sample": null, "score": [0.6815739870071411, 0.4075228273868561], "label": [0, 0], "iou": null, "offset": [800, 1584, 800, 1584]}, "classes": [], "image": [112, 112], "numerical": null}

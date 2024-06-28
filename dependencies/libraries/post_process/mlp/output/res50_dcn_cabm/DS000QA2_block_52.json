@@ -1,1 +1,0 @@
-{"source": "DS000QA2.jpg", "name": "DS000QA2_block_52", "annotation": {"type": "LTRBxyxy", "gt": [], "pred": [[0, 3, 8, 15]], "hard_sample": null, "score": [0.5512869954109192, 0.547301709651947, 0.40625008940696716], "label": [0, 0, 0], "iou": null, "offset": [600, 600, 600, 600]}, "classes": [], "image": [112, 112], "numerical": null}

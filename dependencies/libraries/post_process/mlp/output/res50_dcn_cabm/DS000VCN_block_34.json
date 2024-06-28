@@ -1,1 +1,0 @@
-{"source": "DS000VCN.jpg", "name": "DS000VCN_block_34", "annotation": {"type": "LTRBxyxy", "gt": [], "pred": [[88, 49, 98, 58], [0, 70, 10, 79]], "hard_sample": null, "score": [0.7364227175712585, 0.6154654622077942], "label": [0, 0], "iou": null, "offset": [800, 400, 800, 400]}, "classes": [], "image": [112, 112], "numerical": null}
