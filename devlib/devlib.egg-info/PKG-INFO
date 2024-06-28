@@ -1,0 +1,6 @@
+Metadata-Version: 2.1
+Name: devlib
+Version: 0.1
+Summary: A deep learning auxiliary toolkit designed to adapt to different frameworks,     it includes image processing, model validation, data analysis, visualization, and more.
+Author: HYH
+Author-email: huangyihong0303@gmail.com

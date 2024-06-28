@@ -1,3 +1,4 @@
+from typing import Callable
 import cv2
 import os
 import numpy as np
@@ -5,494 +6,305 @@ import xml.etree.ElementTree as ET
 import random
 import math
 import argparse
-
+from tqdm import tqdm
+from .._base_ import DataProcessBase_
+from .._base_ import DataConstructor
+import gc
 # from .._base_ import DataBase_
 
 # class Process(DataBase_):
 #     pass
 
-class DataProcess:
+class patch_data(DataConstructor):
+    def __init__(self) -> None:
+        super().__init__()
+        self.numerical_data_template = None
+        self.annotation_template = {'type':None, 'gt':None, 'offset':None}
+        self.imgdata_template = {
+            'origin':None
+        }
+        
+        self._re_construct()
+
+class GetImagePatch(DataProcessBase_):
+    def __init__(self, datastructure=patch_data) -> None:
+        self.datastructure = datastructure()
+        super().__init__()
+        pass
     
-    def __init__(self, Type:str=None) -> None:
+    def contain_(self, **kwargs):
+        mask = np.all(np.stack([
+            kwargs['box_data'][:, 0] >= kwargs['area'][0],
+            kwargs['box_data'][:, 1] >= kwargs['area'][1],
+            kwargs['box_data'][:, 2] <= kwargs['area'][2],
+            kwargs['box_data'][:, 3] <= kwargs['area'][3]
+        ], axis=-1), axis=-1)
+        return mask
+    
+    def soft_contain_(self, **kwargs):
         '''
-            params:
-                    Type: the type of dataset,("VOC","COCO")
-                    data_name: the topest directory of the dataset, 
+            area = [x_start,y_start,x_end,y_end]
         '''
-        self.Type = Type
-        if Type=="VOC":
-            self.Image_Path = "VOC2012/JPEGImages"
-            self.Annotation_Path = "VOC2012/Annotations"
-            self.Train_Data = "VOC2012/ImageSets/Main/trainval.txt"
-            self.Test_Data = "VOC2012/ImageSets/Main/test.txt"
-            self.ImageSets = "VOC2012/ImageSets/Main"
-            self.Info = "VOC2012/info.txt"
-            self.Annotation_Txt = "VOC2012/Annotations_Txt"
+        box_centre = (kwargs['box_data'][:,0:2] + kwargs['box_data'][:,2:4]) // 2
+        mask = np.all(np.stack([
+            kwargs['area'][0] < box_centre[:,0],
+            kwargs['area'][2] > box_centre[:,0],
+            kwargs['area'][1] < box_centre[:,1],
+            kwargs['area'][3] > box_centre[:,1]
+        ], axis=-1), axis=-1)
+        return mask
+    
+    def cut_patch(self, image_path, annotation_path , patch_size:tuple, overlap:float, screen_out:list=None) -> list:
+        '''
+        params:
+        
+            screen_out:list[func], the function to screen out the block data
+                input: block image(cv2 mat), area(list) ; output: a 1d mask    
+        
+        statement:
+            annotation : (5*N)-> (x,y,x2,y2,cls)
+        
+        '''
+        patch_lists = []
+        
+        image = cv2.imread(image_path)
+        box_data = []
+        if annotation_path:
+            with open(annotation_path,"r") as f:
+                box_data = np.array(f.read().split(),dtype=int)
+                box_data = box_data.reshape((-1,5))
+            
+        # get image name
+        source = os.path.split(image_path)[-1]
+        
+        # get the central coordinates for each GTbox
+        
+        step = tuple(int(i*(1-overlap)) for i in patch_size)
+        height, width, _ = image.shape
+        
+        num_blocks_height = math.ceil((height-patch_size[1]) / step[1]) + 1 
+        num_blocks_width = math.ceil((width-patch_size[0]) / step[0]) + 1
+        
+        block_count = 0
+        for i in range(num_blocks_height):
+            for j in range(num_blocks_width):
+                # 计算裁剪边界
+                y_start = i * step[1]
+                y_end = int(min(y_start + patch_size[1], height))
+                x_start = j * step[0]
+                x_end = int(min(x_start + patch_size[0], width))
+                
+                # 修正裁剪边界，若超出图片尺寸，采用从边界往回裁剪的方式
+                if(y_start + patch_size[1] > height):
+                    y_start = y_end - patch_size[1]
+                if(x_start + patch_size[0] > width):
+                    x_start = x_end - patch_size[0]
+
+                area = [x_start,y_start,x_end,y_end]
+                # 裁剪图片块
+                patch_img = image[y_start:y_end, x_start:x_end]
+                # 判断该图片块内是否含有目标框，并生成掩膜，用于筛选出在该图片块内的目标框
+                block_data = []
+                if len(box_data) > 0:
+                    mask = self.soft_contain_(patch_img = patch_img, box_data = box_data, area = area)
+                    block_data = box_data[mask]
+                
+                # 若存在其余筛选条件，则进行额外的筛选
+                # flag 表示是否保留当前的裁剪
+                if screen_out:
+                    flag = True
+                    for func, params in screen_out:
+                        flag = np.logical_and(flag, func(*params, patch_img = patch_img, box_data = box_data, area = area))
+                        
+                    if not flag:
+                        continue
+                
+                if len(block_data) != 0:
+                    # 坐标修正，保存相对坐标
+                    block_data[:, 0] = np.maximum(0, block_data[:, 0] - x_start)
+                    block_data[:, 1] = np.maximum(0, block_data[:, 1] - y_start)
+                    block_data[:, 2] = np.minimum(x_end, block_data[:, 2] - x_start)
+                    block_data[:, 3] = np.minimum(y_end, block_data[:, 3] - y_start)
+                    classes = block_data[:,4]
+                else:
+                    classes = np.array([])
+                    classes.resize([0,1])
+                    block_data = np.array([])
+                    block_data.resize([0,5])
+                    
+                # 保存数据
+                name = source[:-4] + f"_block_{block_count}"
+                offset = np.array([x_start,y_start,x_start,y_start])
+                patch_lists.append(self.datastructure.get_item(source, name, classes, {'origin':patch_img},{'type':"LTRBxyxy",'gt':block_data,'offset':offset}))
+                block_count += 1
+    
+        return patch_lists
+    
+    
+    def cut_image(self, image_dir, annotation_dir, patch_size:tuple, overlap:float, screen_out:list[list[Callable,tuple]]=None):
+        '''
+        params
+            image_dir
+            annotation_dir
+            patch_size
+            overlap
+            screen_out：二维列表[[func,params]...],func为自定义的筛选函数,params为额外参数,默认已有参数为,(图片块数据,ma目标框坐标,图片快坐标偏置)
+        '''
+        # 构建数据路径
+        img_list=[]
+        annotation_list=[]
+        for i in os.listdir(image_dir):
+            img_list.append(os.path.join(image_dir,i))
+            annotation_list.append(os.path.join(annotation_dir,i[:-4]+".txt"))
+            
+        # 数据集构建Sp
+        data_set=[]
+        print('*'*10+'cut patches'+'*'*10)
+        for index,(ip,ap) in tqdm(enumerate(zip(img_list,annotation_list)),colour='green'):
+            # #test:
+            # if index > 3:
+            #     break
+            
+            # 图片裁剪
+            patch_lists = self.cut_patch(ip, ap, patch_size, overlap, screen_out)
+            data_set.extend(patch_lists)
+        return data_set
+    
+    # def crop_patch(self, image, boxes, size=None, if_contain=True):
+
+    #     for i, b in enumerate(boxes):
+    #         # 裁剪样本框
+    #         x, y, x2, y2, cls = map(int,b)
+    #         if size:
+                
+    #         cropped = image[y:y2, x:x2]
+            
+    #         # 调整大小
+    #         resized = cv2.resize(cropped, patch_size ,interpolation=cv2.INTER_CUBIC)
+            
+    #         name = source[:-4] + f"_patch{i}_cls{int(cls)}"
+    #         patch_lists.append(self.get_item(source, name, resized,["LTWHxywh",[[x, y, w, h, cls]]]))
+                
+
+    #     pass
+    
+    def crop_image(self, image_dir, annotation_dir, patch_size):
+        img_list=[]
+        annotation_list=[]
+        data_set=[]
+        
+        for i in os.listdir(image_dir):
+            img_list.append(os.path.join(image_dir,i))
+            annotation_list.append(os.path.join(annotation_dir,i[:-4]+".txt"))
+            
+        for index,(ip,ap) in enumerate(zip(img_list,annotation_list)):
+            patch_lists = self._crop(ip, ap, patch_size)
+            data_set.extend(patch_lists)        
         pass
 
-    def make_dir(self, name):
-        if not os.path.exists(name):
-            os.makedirs(name)
-            if(self.Type=="VOC"):
-                os.makedirs(os.path.join(name,"VOC2012"))
-                os.makedirs(os.path.join(name,self.Annotation_Path))
-                os.makedirs(os.path.join(name,self.Image_Path))    
-                os.makedirs(os.path.join(name,self.Annotation_Txt))        
-                os.makedirs(os.path.join(name,self.ImageSets))  
+class MergeImagePatch(GetImagePatch):
+    def __init__(self, datastructure=patch_data) -> None:
+        super().__init__(datastructure=datastructure)
         
+    def merge(self, patch_lists, patch_size, target_size, expend_index):
+        '''
+        将多个patch合成一个图片, 例如 56*56 合成 112*112，则需要4个patch，通过将patch_lists经过多次随机打乱生成不同的patch_lists保存在candidates
+        再从左到右，从上到下进行组合
+        params：
+        '''
+        
+        # 创建merge patch 返回列表
+        merge_lists = []
+        # 记录原图片名字
+        source = patch_lists[0]['source']
+        # 数据扩充
+        patch_lists *= int(expend_index)
+        random.shuffle(patch_lists)
+        # candidates ，dim= k*len(patch_lists), k表示目标图片由多少个patch构成
+        merge_step = (target_size[0] // patch_size[0], target_size[1] // patch_size[1])
+        patchs_num = merge_step[0] * merge_step[1]
+
+        # 构建candidates
+        '''
+        warning: 这种方式在进行非单张图的merge时，也即patch_lists很大，可能会导致内存占用过大，可以采取
+                    边拼接边shuffle的方式，不进行candidates的构建吗，对于patch_lists，依次取样拼接，当索引超出时，将其shuffle再从头采样
+        有空改一下
+        '''
+        candidates = []
+        for i in range(patchs_num):
+            random.seed(i)
+            candidates.append(random.sample(patch_lists, k=len(patch_lists)))
+        
+        for k in range(len(patch_lists)):
+            name = f"{source[:-4]}_mix_{k}"
+            # 创建空图片，box，classes，用于构建数据字典
+            res_image = np.zeros((target_size[0], target_size[1], 3), dtype=np.uint8)
+            res_boxes = []
+            res_classes = []
+            
+            # 组合成第k张图片
+            for i in range(merge_step[0]):
+                for j in range(merge_step[1]):
+                    patch_index = i * merge_step[1] + j
+                    patch = candidates[patch_index][k]
+                    patch_img = patch['image']['origin']
+                    patch_boxes = patch['annotation']['gt']
+                    patch_classes = patch['classes']
+                    
+                    # 放置patch到对应位置
+                    x_start, y_start = j * patch_size[0], i * patch_size[1]
+                    res_image[y_start:y_start + patch_size[1], x_start:x_start + patch_size[0], :] = patch_img
+
+                    # 调整boxes坐标
+                    adjusted_boxes = patch_boxes + np.array([x_start, y_start, x_start, y_start, 0])
+                    res_boxes.extend(adjusted_boxes)
+                    res_classes.extend(patch_classes)
+            
+            # 构建数据字典，并保存
+            res_boxes = np.array(res_boxes)
+            res_classes = np.array(res_classes)
+            merged_item = self.datastructure.get_item(source, name, res_classes, {'origin':res_image},{'type':"LTRBxyxy",'gt':res_boxes})
+            merge_lists.append(merged_item)
+        
+        return merge_lists
     
-    def calculate_mean_variance(self, img_dir:str, info_out:str) -> list[int]:
-        '''
-        calculate the mean value and variance value of a batch of images
-        
-        params:
-                image_paths : dir of the .jpg file. the default value is self.Image_Path
-        return:
-                means: means of each chanels (BGR)
-                variances: variances of each chanels (BGR)
-        '''
-        means = [0, 0, 0]
-        variances = [0, 0, 0]
-        
-        if(not os.path.exists(img_dir)):
-            print("{} is not exists".format(img_dir))
-            return
-        
-        
-        images_list = [os.path.join(img_dir,i) for i in os.listdir(img_dir)]
-        means=np.array([0.,0.,0.])
-        stds = np.array([0.,0.,0.])
-        for image_path in images_list:
-            image = cv2.imread(image_path)
-            image = cv2.cvtColor(image,cv2.COLOR_BGR2RGB)
+    def merge_image(self, image_dir, annotation_dir, patch_size:tuple, overlap:float, target_size:tuple, expend_index:float, screen_out:list=None):
+        img_list=[]
+        annotation_list=[]
+        for i in os.listdir(image_dir):
+            img_list.append(os.path.join(image_dir,i))
+            annotation_list.append(os.path.join(annotation_dir,i[:-4]+".txt"))
             
-            if image is None:
-                print(f"Error: Unable to load image {image_path}")
-                continue
-            
-            image_float = image.astype(np.float32)
-            mean, std_dev = cv2.meanStdDev(image_float)
-
-            mean = mean.flatten()
-            std_dev = std_dev.flatten()
-        
-            means += mean
-            stds += std_dev
-        
-       
-        means /= len(os.listdir(img_dir))
-        stds /= len(os.listdir(img_dir))
-        
-        
-        with open(info_out,"w+") as f:
-            m = [str(i)+"," for i in means]
-            v = [str(i)+"," for i in stds]
-            f.writelines(["mean: "]+m)
-            f.writelines("\n")
-            f.writelines(["variances: "]+v)
-        
-        return means, variances
+        data_set=[]
+        print('*'*10+'cut and merge patches'+'*'*10)
+        for index,(ip,ap) in tqdm(enumerate(zip(img_list,annotation_list)),colour='green'):
+            # #test:
+            # if index > 3:
+            #     break
+            patch_lists = self.cut_patch(ip, ap, patch_size, overlap, screen_out)
+            merge_lists = self.merge(patch_lists, patch_size, target_size, expend_index)
+            data_set.extend(merge_lists)
+        return data_set
     
-    def txt2xml(self,txt_dir:str ,xml_dir:str ,cn:tuple) -> None:
+    def merge_image_out(self, image_dir, annotation_dir, patch_size:tuple, overlap:float, target_size:tuple, expend_index:float, screen_out:list=None):
         '''
-        convert the txt file to VOC Dataset xml file;
-        txt format:
-            824 1498 7 8 0 1142 988 11 13 0  -> N*(x,y,w,h,classes) .....
-            
-        params:
-                txt_dir: dir path of  txt files
-                xml_dir: save path of xml files
-                cn: class name ,example: ("MA","background")
-        return:
-                None
+        patch 的选取不限于同一张图片
         '''
-        
-        if(not os.path.exists(txt_dir)):
-            print("{} is not exists".format(txt_dir))
-            return
-        if(not os.path.exists(xml_dir)):
-            os.makedirs(xml_dir)
-        
-        txt_list = os.listdir(txt_dir)
-        for t in txt_list:
-
-            with open(os.path.join(txt_dir,t), 'r') as f:
-                data_line = np.array(f.readline().split()).astype(int)  
-
-            bboxes = data_line.reshape((-1,5))
-
-            xml_root = ET.Element('annotation')
-
-            for bbox in bboxes:
-                x, y, width, height, index= map(int, bbox)
-                bndbox = ET.SubElement(xml_root, 'object')
-                ET.SubElement(bndbox, 'name').text = cn[int(index)]
-                ET.SubElement(bndbox, 'pose').text = 'Unspecified'
-                ET.SubElement(bndbox, 'truncated').text = '0'
-                ET.SubElement(bndbox, 'difficult').text = '0'
-
-                bndbox_elem = ET.SubElement(bndbox, 'bndbox')
-                ET.SubElement(bndbox_elem, 'xmin').text = str(x)
-                ET.SubElement(bndbox_elem, 'ymin').text = str(y)
-                ET.SubElement(bndbox_elem, 'xmax').text = str(x + width)
-                ET.SubElement(bndbox_elem, 'ymax').text = str(y + height)
-
-            tree = ET.ElementTree(xml_root)
-            tree.write(os.path.join(xml_dir,t[:-4]+".xml"), encoding='utf-8', xml_declaration=True)
-    
-    
-    def mask2gtbox(self, gtmask_dir:str, txt_dir:str) -> None:
-        '''
-        convert the binary mask image to bt box coordinate and save as txt file
-        params:
-                gtmask_dir: dir path of binary mask images
-                txt_dir: save path of txt files
-        return: 
-                None
-        '''
-
-        if(not os.path.exists(txt_dir)):
-            os.makedirs(txt_dir)
+        img_list=[]
+        annotation_list=[]
+        for i in os.listdir(image_dir):
+            img_list.append(os.path.join(image_dir,i))
+            annotation_list.append(os.path.join(annotation_dir,i[:-4]+".txt"))
             
-        lists = os.listdir(gtmask_dir)
+        data_set=[]
+        print('*'*10+'cut and merge patches'+'*'*10)
+        for index,(ip,ap) in tqdm(enumerate(zip(img_list,annotation_list)),colour='green'):
+            # #test:
+            # if index > 3:
+            #     break
+            patch_lists = self.cut_patch(ip, ap, patch_size, overlap, screen_out)
+            data_set.extend(patch_lists)
         
-
-        for l in lists:
-                
-            img_path = os.path.join(gtmask_dir,l)
-            try:
-                mask = (cv2.imread(img_path))[:,:,0]
-            except:
-                print(img_path)
-            box_num, labels, boxes, centroids = cv2.connectedComponentsWithStats(mask, connectivity=8)
-            boxes = (boxes[boxes[:,4].argsort()])[:-1]
-            boxes[:,4] = 0
-            with open(os.path.join(txt_dir,l[:-4])+".txt","w") as f:
-                for b in boxes:
-                    b = [str(i)+" " for i in b]
-                    f.writelines(b)
-    
-    
-    def data_split(self, datalist_dir:str, out_path:tuple, k:int=0.8) -> None:
-        '''
-        split the Dataset into train dataset and eval dataset
-        params:
-                datalist_dir: dir of the data image list .jpg files 
-                out_path: save path of the result tx file, a tuple ("trainval.txt","text.txt")
-                k: the proportion of train dataset (0~1)
-        return:
-                None
-        
-        '''
-        image_files = os.listdir(datalist_dir)
-        
-        train_count = int(len(image_files) * k)
-        test_count = len(image_files) - train_count
-
-        train_files = random.sample(image_files, train_count)
-        test_files = [f for f in image_files if f not in train_files]
-
-        with open(out_path[0], 'w') as f:
-            for file_name in train_files:
-                f.write(file_name[:-4] + '\n')
-
-        with open(out_path[1], 'w') as f:
-            for file_name in test_files:
-                f.write(file_name[:-4] + '\n')
-        print("-"*10+"dataset split complete"+"-"*10)
-        
-
-    def image_cut(self, img_dir:tuple, label_dir:tuple, block:list, overlap:float, split:float=None, split_path:tuple=None, whole=False) -> tuple:
-        '''
-        cut the image block that contains target from origin picture
-        params:
-                img_dir: dir path of origin images 
-                label_dir: dir path of origin txt annotations defined as ...
-                save_dir: the parent directory of the result composed of two Dirs, images and  annotations_txt
-                block: the image block size 
-                overlap: the overlap index (0~1) 
-                split: the value(0~1),if not none, to split the dataset for train set
-                split_path: the paths to save the dataset txt files; (train.txt,test.txt)
-        return: 
-                a tuple contains image block save path and image xml annotations save path
-        '''
-
-        value=np.array([  9.29097577, 120.99673151, 100.91605548])
-        image_block_save_path = img_dir[1]
-        annotation_block_save_path = label_dir[1]
-        
-        if not os.path.exists(image_block_save_path):
-            os.makedirs(image_block_save_path)
-        if not os.path.exists(annotation_block_save_path):
-            os.makedirs(annotation_block_save_path)
-        
-        block_size = block
-        step = [int(i*(1-overlap)) for i in block]
-        # step = 80
-        
-        img_list = [i[:-4]for i in os.listdir(img_dir[0])]
-        img_path = [os.path.join(img_dir[0],i+".jpg") for i in img_list]
-        box_path = [os.path.join(label_dir[0],i+".txt") for i in img_list]
-        train_list=[]
-        test_list=[]
-
-        print("-"*10+"data loading complete"+"-"*10)
-        
-        for index in range(len(img_list)):
-            block_count = 0
-            # read the image and load its GT box
-            image = cv2.imread(img_path[index])
-            with open(box_path[index],"r") as f:
-                box_data = np.array(f.readline().split(),dtype=int)
-                box_data = (box_data.reshape((-1,5)))
-                
-            
-            # get the central coordinates for each GTbox
-            box_num = box_data.shape[0]
-            box_centre = np.zeros((box_num,2))
-            for i in range(box_num):
-                box_centre[i] = box_data[i,0:2] + box_data[i,2:4]/2
-
-            height, width, _ = image.shape
-            
-            num_blocks_height = math.ceil((height-block_size[1]) / step[1]) + 1 
-            num_blocks_width = math.ceil((width-block_size[0]) / step[0]) + 1
-
-            for i in range(num_blocks_height):
-                for j in range(num_blocks_width):
-                    
-                    # cut the block from image
-                    y_start = i * step[1]
-                    y_end = int(min(y_start + block_size[1], height))
-                    x_start = j * step[0]
-                    x_end = int(min(x_start + block_size[0], width))
-                    
-                    # if the block exceed the image resolution, then cut it back from the boundary
-                    
-                    if(y_start + block_size[1] > height):
-                        y_start = y_end - block_size[1]
-                    if(x_start + block_size[0] > width):
-                        x_start = x_end - block_size[0]
-                    
-                    block = image[y_start:y_end, x_start:x_end]
-                    
-
-                    
-                    # select all the block that contain target
-                    
-                    x = np.array([ (x_start<i[0]<x_end) for i in box_centre])
-                    y = np.array([ (y_start<i[1]<y_end) for i in box_centre])
-                    cobj = x*y
-                    if not whole:
-                        if(sum((x*y).astype(int))==0):
-                            continue
-                    block_data = box_data[cobj]
-                    
-                    # Coordinate correction
-                    
-                    for bb in block_data:
-                        bb[0] = max(0,bb[0]-x_start)
-                        bb[1] = max(0,bb[1]-y_start)
-                        bb[2] = min(x_end-bb[0],bb[2])
-                        bb[3] = min(y_end-bb[1],bb[3])
-
-                    # save block
-                    block_filename = img_list[index] + f"_block_{block_count}"
-                    if(split):
-                        if(index<=len(img_list)*split):
-                            train_list.append(block_filename)
-                        else:
-                            test_list.append(block_filename)
-                    
-                    cv2.imwrite(os.path.join(image_block_save_path,block_filename+".jpg"), block)
-                    with open(os.path.join(annotation_block_save_path,block_filename+".txt"),"w") as f:
-                        for box in block_data:
-                            f.writelines([str(i)+" " for i in box])
-                    
-
-                    # print(f"Saved block {img_list[index]}_{block_count} as {block_filename}")
-                    block_count += 1
-        if(split):
-            with open(split_path[0],"w+") as f:
-                for i in train_list:
-                    f.write(i+"\n")
-            with open(split_path[1],"w+") as f:
-                for i in test_list:
-                    f.write(i+"\n")
-                
-        print("-"*10+"image cutting complete"+"-"*10)
-    
-
-    def image_patch_merge_witin(self, img_dir:tuple, label_dir:tuple, block_size:list, target_size:list, overlap:float, split:float, split_path:tuple) -> tuple:
-        
-        '''
-        cut the image patch and then merge into a picture. For now it only support to merge 4 patch, whihc means 56*56 patch will generate a image with size (112*112)
-        params:
-                img_dir: dir path of origin images 
-                label_dir: dir path of origin txt annotations defined as ...
-                save_dir: the parent directory of the result composed of two Dirs, images and  annotations_txt
-                block: the image block size 
-                overlap: the overlap index (0~1) 
-        return: 
-                a tuple contains image block save path and image xml annotations save path
-        '''
-        value=np.array([  9.29097577, 120.99673151, 100.91605548])
-        image_block_save_path = img_dir[1]
-        annotation_block_save_path = label_dir[1]
-        
-        if not os.path.exists(image_block_save_path):
-            os.makedirs(image_block_save_path)
-        if not os.path.exists(annotation_block_save_path):
-            os.makedirs(annotation_block_save_path)
-        
-        
-        
-        step = [int(i*(1-overlap)) for i in block_size]
-        # step = 80
-
-        img_list = [i[:-4]for i in os.listdir(img_dir[0])]
-        img_path = [os.path.join(img_dir[0],i+".jpg") for i in img_list]
-        box_path = [os.path.join(label_dir[0],i+".txt") for i in img_list]
-        
-        print("-"*10+"data loading complete"+"-"*10)
-        
-        block_images = []
-        block_names = []
-        block_boxes = []
-        train_list=[]
-        test_list=[]
-        merge_id=0
-        for index in range(len(img_list)):
-            block_count = 0
-            # read the image and load its GT box
-            image = cv2.imread(img_path[index])
-            with open(box_path[index],"r") as f:
-                box_data = np.array(f.readline().split(),dtype=int)
-                box_data = (box_data.reshape((-1,5)))  #x,y,w,h,class
-                
-            # get the central coordinates for each GTbox
-            box_num = box_data.shape[0]
-            box_centre = np.zeros((box_num,2))
-            for i in range(box_num):
-                box_centre[i] = box_data[i,0:2] + box_data[i,2:4]/2
-
-            height, width, _ = image.shape
-            
-            num_blocks_height = math.ceil((height-block_size[1]) / step[1]) + 1 
-            num_blocks_width = math.ceil((width-block_size[0]) / step[0]) + 1
-            
-            for i in range(num_blocks_height):
-                for j in range(num_blocks_width):
-                    
-                    # cut the block from image
-                    y_start = i * step[1]
-                    y_end = int(min(y_start + block_size[1], height))
-                    x_start = j * step[0]
-                    x_end = int(min(x_start + block_size[0], width))
-                    
-                    # if the block exceed the image resolution, then cut it back from the boundary
-                    
-                    if(y_start + block_size[1] > height):
-                        y_start = y_end - block_size[1]
-                    if(x_start + block_size[0] > width):
-                        x_start = x_end - block_size[0]
-                    
-                    block = image[y_start:y_end, x_start:x_end]
-                    
-                    # block = (block>8).astype(np.uint8)*block
-                    # hsv_block = cv2.cvtColor(block, cv2.COLOR_BGR2HSV)
-                    # image_float = hsv_block.astype(np.float32) 
-                    # mean, std_dev = cv2.meanStdDev(image_float)
-                    # mean = mean.flatten()
-                    # std_dev = std_dev.flatten()
-                    # adj_value = value - mean
-                    # hsv_block[:,:,2] = cv2.add(hsv_block[:,:,2], adj_value[2])
-                    # block = cv2.cvtColor(hsv_block, cv2.COLOR_HSV2BGR)
-                    
-                    
-                    
-                    # select all the block that contain MA
-                    x = np.array([ (x_start<i[0]<x_end) for i in box_centre])
-                    y = np.array([ (y_start<i[1]<y_end) for i in box_centre])
-                    cobj = x*y
-                    if(sum((x*y).astype(int))==0):
-                        continue
-                    
-                    # Coordinate correction
-                    block_data = box_data[cobj]
-                    for bb in block_data:
-                        bb[0] = max(0,bb[0]-x_start)
-                        bb[1] = max(0,bb[1]-y_start)
-                        bb[2] = min(x_end-bb[0],bb[2])
-                        bb[3] = min(y_end-bb[1],bb[3])
-                        
-                    # save block
-                    block_filename = img_list[index] + f"_block_{block_count}"
-                    
-                    block_images.append(block)
-                    block_names.append(block_filename)
-                    block_data = block_data.flatten()
-                    block_boxes.append(block_data)
-                    # print(f"Saved block {img_list[index]}_{block_count} as {block_filename}")
-                    block_count += 1
-            
-            data_package = list(zip(block_names,block_images,block_boxes))
-
-
-            l = len(data_package)
-            
-            merge_step = int(target_size[0]/block_size[0])
-            patchs_num = merge_step ** 2
-            
-            candidates = []
-    
-                
-            res_image = np.zeros((target_size[0],target_size[1],3))
-            
-            for i in range(patchs_num):
-                random.seed(i*l/patchs_num)
-                candidate_ = random.sample(data_package,k=l)
-                candidates.append(candidate_)
-            
-            data_package.clear()
-            block_images.clear()
-            block_names.clear()
-            block_boxes.clear()
-            
-            for k in range(l):
-                dataname = "mix_image_{}".format(merge_id)
-                merge_id +=1
-                res_boxes = np.array([])
-                for i in range(merge_step):
-                    for j in range(merge_step):
-                        res_image[i*block_size[1]:(i+1)*block_size[1],j*block_size[0]:(j+1)*block_size[0],:] = candidates[i*merge_step+j][k][1]
-                        
-                        box_correct = candidates[i*merge_step+j][k][2] + np.array([j*block_size[0],i*block_size[1],0,0,0]*int(len(candidates[i*merge_step+j][k][2])/5))
-                        res_boxes = np.hstack((res_boxes,box_correct))
-                        
-                if(index<=len(img_list)*split):
-                    train_list.append(dataname)
-                else:
-                    test_list.append(dataname)
-                
-                cv2.imwrite(os.path.join(image_block_save_path,dataname+".jpg"),res_image)
-                
-                with open(os.path.join(annotation_block_save_path,dataname+".txt"),"w+") as f:
-                    f.writelines([str(int(i))+" " for i in res_boxes ])
-            
-        with open(split_path[0],"a+") as f:
-            for i in train_list:
-                f.write(i+"\n")
-        with open(split_path[1],"a+") as f:
-            for i in test_list:
-                f.write(i+"\n")            
-            
-            
-        print("-"*10+"image cutting complete"+"-"*10)
-        
-if __name__ == "__main__" :
-    
-    # tool = DataProcess("VOC")
-    # tool.calculate_mean_variance("/home/hyh/Documents/quanyi/project/Data/e_optha_MA/ProcessedData/MAimages_CutPatch(112,112)_overlap50.0/VOC2012/JPEGImages","/home/hyh/Documents/quanyi/project/Data/e_optha_MA/ProcessedData/MAimages_CutPatch(112,112)_overlap50.0/VOC2012/info.txt")
-    
-    pass
+        # 裁剪完全部patch，再进行随机拼接
+        merge_lists = self.merge(data_set, patch_size, target_size, expend_index)
+        return merge_lists

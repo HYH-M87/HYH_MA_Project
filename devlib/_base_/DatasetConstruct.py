@@ -1,4 +1,7 @@
-from .DataBased import DataBase_
+import copy
+
+from tqdm import tqdm
+from .DataBase import DatasetBase_
 import os
 import xml.etree.ElementTree as ET
 import numpy as np
@@ -6,57 +9,38 @@ from typing import Union, Any
 
 import cv2
 
-class DatasetConstruct(DataBase_):
-    def __init__(self, Type: str | dict) -> None:
-        super().__init__(Type)
+class DatasetConstructor(DatasetBase_):
+    def __init__(self, Cfg:Union[str, dict], **kwargs) -> None:
+        super().__init__(Cfg)
+        if len(kwargs) != 0:
+            self.add_(kwargs)
+        
+    def add_(self, more_dir:dict):
+        for k,v in more_dir.items():
+            self.data_path_cfg[k] = v
         
     def makedirs(self, name:str):
         '''
         param: 
             name: the path to the topest directory; 
-        
         '''
+        print('*'*10+'making dataset directory'+'*'*10)
         if not os.path.exists(name):
-            if not os.path.exists(name):
-                os.makedirs(os.path.join(name,self.Annotation_Path))
-                os.makedirs(os.path.join(name,self.Image_Path))    
-                os.makedirs(os.path.join(name,self.Annotation_Txt))        
-                os.makedirs(os.path.join(name,self.ImageSets))  
+            for k,v in self.data_path_cfg.items():
+                if k.endswith('Dir'):
+                    os.makedirs(os.path.join(name,v))
+                    print(f'make : {os.path.join(name,v)}')
+        else:
+            print('dataset has already existed')
 
+    def get_path(self, name):
+
+        path_dict = copy.deepcopy(self.data_path_cfg)
+        for k,v in self.data_path_cfg.items():
+            path_dict[k] = os.path.join(name,v)
+        return path_dict
     
-    def mask2box(self, cls:int, gtmask_dir:str, txt_dir:str=None):
-        '''
-        convert the binary mask image to bt box coordinate and save as txt file
-        params:
-                cls : the class of the mask
-                gtmask_dir: dir path of binary mask images
-                txt_dir: save path of txt files
-        return: 
-                None
-        '''
-        if txt_dir is None:
-            txt_dir = self.Annotation_Txt
-            
-        if(not os.path.exists(txt_dir)):
-            os.makedirs(txt_dir)
-            
-        lists = os.listdir(gtmask_dir)
-        
 
-        for l in lists:
-                
-            img_path = os.path.join(gtmask_dir,l)
-            try:
-                mask = (cv2.imread(img_path))[:,:,0]
-            except:
-                print(img_path)
-            box_num, labels, boxes, centroids = cv2.connectedComponentsWithStats(mask, connectivity=8)
-            boxes = (boxes[boxes[:,4].argsort()])[:-1]
-            boxes[:,4] = cls
-            with open(os.path.join(txt_dir,l[:-4])+".txt","w") as f:
-                for b in boxes:
-                    b = [str(i)+" " for i in b]
-                    f.writelines(b)
     
     def convert(self):
         pass
@@ -71,7 +55,7 @@ class DatasetConstruct(DataBase_):
         '''
         convert the txt file to VOC Dataset xml file;
         txt format:
-            824 1498 7 8 0 1142 988 11 13 0  -> N*(x,y,w,h,classes) .....
+            N*(x,y,x,y,classes) .....
             
         params:
                 txt_dir: dir path of  txt files
@@ -88,7 +72,8 @@ class DatasetConstruct(DataBase_):
             os.makedirs(xml_dir)
         
         txt_list = os.listdir(txt_dir)
-        for t in txt_list:
+        print('*'*10 + 'changing txt to voc xml file'+'*'*10)
+        for t in tqdm(txt_list,colour='green'):
 
             with open(os.path.join(txt_dir,t), 'r') as f:
                 data_line = np.array(f.readline().split()).astype(int)  
@@ -98,7 +83,7 @@ class DatasetConstruct(DataBase_):
             xml_root = ET.Element('annotation')
 
             for bbox in bboxes:
-                x, y, width, height, index= map(int, bbox)
+                x, y, x2, y2, index= map(int, bbox)
                 bndbox = ET.SubElement(xml_root, 'object')
                 ET.SubElement(bndbox, 'name').text = cn[int(index)]
                 ET.SubElement(bndbox, 'pose').text = 'Unspecified'
@@ -108,8 +93,8 @@ class DatasetConstruct(DataBase_):
                 bndbox_elem = ET.SubElement(bndbox, 'bndbox')
                 ET.SubElement(bndbox_elem, 'xmin').text = str(x)
                 ET.SubElement(bndbox_elem, 'ymin').text = str(y)
-                ET.SubElement(bndbox_elem, 'xmax').text = str(x + width)
-                ET.SubElement(bndbox_elem, 'ymax').text = str(y + height)
+                ET.SubElement(bndbox_elem, 'xmax').text = str(x2)
+                ET.SubElement(bndbox_elem, 'ymax').text = str(y2)
 
             tree = ET.ElementTree(xml_root)
             tree.write(os.path.join(xml_dir,t[:-4]+".xml"), encoding='utf-8', xml_declaration=True)
