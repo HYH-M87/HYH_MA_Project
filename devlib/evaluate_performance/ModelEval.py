@@ -85,13 +85,13 @@ class ModelEval():
                 pred_iou[mask, 1] = index
                 if np.max(iou[mask]) < self.iou_threshold:
                     max_index = np.argmax(iou)
-                    hard_sample.append([gtbox, np.hstack((Pred[max_index], iou[max_index])) ])
+                    hard_sample.append([gtbox, Pred[max_index], iou[max_index]])
             else:
                 if len(Pred) == 0:
-                    hard_sample.append([gtbox, np.full_like(gtbox, -1) ])
+                    hard_sample.append([gtbox, np.full_like(gtbox, -1), -1])
                 else:
                     max_index = np.argmax(iou)
-                    hard_sample.append([gtbox, np.hstack((Pred[max_index], iou[max_index])) ])
+                    hard_sample.append([gtbox, Pred[max_index], iou[max_index]])
                 
         return pred_iou, hard_sample
     
