@@ -10,7 +10,7 @@ import os
 from torch.utils.tensorboard import SummaryWriter 
 
 from mlp.dataset import MA_patch
-from mlp.model import MLP
+from mlp.model import MLP, THCModel
 
 # 超参数
 input_size = [56,56]
@@ -19,7 +19,7 @@ learning_rate = 0.0001
 num_epochs = 300
 batch_size = 32
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-log_dir = "logs/MA_Detection/mlp_cls/exp1"
+log_dir = "logs/MA_Detection/res_cls/56patch_test"
 if not os.path.exists(log_dir):
     os.makedirs(log_dir)
     
@@ -31,20 +31,23 @@ transform = transforms.Compose([
     transforms.ToTensor()
 ])
 
-data_dir = '/home/hyh/Documents/quanyi/project/Data/e_optha_MA/extract_sample'
+data_dir = '/home/hyh/Documents/quanyi/project/Data/e_optha_MA/extract_sample_test'
 train_dataset = MA_patch(data_dir,True,transform)
 test_dataset = MA_patch(data_dir,False,transform)
 train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
 test_loader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False)
 
-model = MLP(input_size, output_size)
+# model = MLP(input_size, output_size)
+model = THCModel()
+print(model)
 start=0
-checkpoint="logs/MA_Detection/mlp_cls/exp1/epoch_129.pth"
+checkpoint="logs/MA_Detection/res_cls/112patch/0.pth"
 if os.path.exists(checkpoint):
     model.load_state_dict(torch.load(checkpoint))
     start = int(os.path.split(checkpoint)[-1][6:-4])+1
+    
 model.to(device)
-criterion = nn.CrossEntropyLoss()
+criterion = nn.CrossEntropyLoss(torch.tensor([2, 1]).to(device))
 optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9, weight_decay=0.0001)
 
 

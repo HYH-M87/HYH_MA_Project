@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 import os
 from tqdm import tqdm
 from mlp.dataset import MA_patch
-from mlp.model import MLP
+from mlp.model import MLP,THCModel
 from devlib._base_ import NumpyDecoder, NumpyEncoder
 from devlib._base_ import DatasetBase_ 
 from devlib._base_ import DataProcessBase_
@@ -29,55 +29,45 @@ def parse_args():
 
 
 class Stage2():
-    def __init__(self, data_dir, result_dir, save_dir, model, patch_size, 
+    def __init__(self, image_dir, json_dir, save_dir, model, patch_size, 
                 transforms=transforms.Compose([
                         transforms.ToTensor()
                     ])
                 ) -> None:
-        self.data_dir = data_dir
-        self.result_dir = result_dir
+        '''
+
+            image_dir : 保存MA图片文件的路径，不是Patch
+            result_dir : 保存JSON文件的目录路径
+        '''
+        self.image_dir = image_dir
+        self.json_dir = json_dir
         self.save_dir = save_dir
         self.patch_size = patch_size
         self.transforms = transforms
         self.device = torch.device('cuda')
         self.model = model.to(self.device)
-        
-        
     
-        
-    # def crop_patch(self, image, boxes, size, if_contain=True):
-    #     patches = []
-    #     for b in boxes:
-    #         x, y, x2, y2 = map(int,b)
-    #         cx, cy = (x+x2)//2, (y+y2)//2
-    #         h, w = size
-            
-    #         if if_contain:
-    #             assert w > (x2-x) and h > (y2-y), "target size is bigger than patch size"
-                
-    #         croped_image = image[cy-(h//2):cy+(h//2), cx-(w//2):cx+(w//2), :]
-                
-    #         patches.append(croped_image)
-    #     return patches
-    
-    def crop_patch(self, image, boxes, size, if_contain=True):
+    def crop_patch(self, image, boxes, size=None, if_pad=True):
         
         patches = []
         for b in boxes:
             x, y, x2, y2 = map(int,b)
 
             croped_image = image[y:y2, x:x2, :]
-            croped_image = DataProcessBase_().resize_and_pad(croped_image,[56,56])
+            if if_pad:
+                croped_image = DataProcessBase_().resize_and_pad(croped_image, size)
+            else:
+                croped_image = cv2.resize(croped_image, size)
 
             patches.append(croped_image)
         return patches
     
-    def load_result(self,result_dir):
+    def load_result(self,json_dir):
         '''
         读入数据
         '''
         result_lists=[]
-        json_files = [os.path.join(result_dir, i) for i in os.listdir(result_dir)]
+        json_files = [os.path.join(json_dir, i) for i in os.listdir(json_dir)]
         for i in json_files:
             with open(i,'r') as f:
                 data = json.load(f, cls=NumpyDecoder)
@@ -87,19 +77,25 @@ class Stage2():
 
 
     def forward(self):
-        result_lists = self.load_result(self.result_dir)
+        # 读入json文件数据
+        result_lists = self.load_result(self.json_dir)
         # result_lists = result_lists[3698:3700]
         self.model.eval() 
         with torch.no_grad():
             for i in tqdm(result_lists, colour='green'):
-                image = cv2.imread(os.path.join(self.data_dir, i['source']))
+                image = cv2.imread(os.path.join(self.image_dir, i['source']))
+                # 如果该patch存在预测框
                 if len(i['annotation']['pred']) != 0:
+                    # 预测框坐标修正
                     boxes = i['annotation']['pred'] + i['annotation']['offset']
+                    # 构建模型输入
                     patches = self.construct_input(self.crop_patch(image, boxes, self.patch_size)).to(self.device)
                     outputs = self.model(patches)
                     _, predicted = torch.max(outputs.data, 1)
+                    # 筛选出预测为MA的检测框
                     mask = (predicted.to(torch.device('cpu')) == 0).numpy()
                     i['annotation']['pred'] =  i['annotation']['pred'][mask]
+        # 保存筛选后的数据
         self.save(result_lists)
 
     def save(self,result_lists):
@@ -109,6 +105,10 @@ class Stage2():
         
 
     def construct_input(self, images):
+        '''
+        step1: 对数据进行必要的transforms
+        step2: 构建模型输入张量 -> (b,c,h,w)
+        '''
         results=[]
         if self.transforms:
             for img in images:
@@ -122,26 +122,30 @@ def main():
     patch_size = [56,56] # 输入层大小
     inchanel = 3
     output_size = 2  
-    model = MLP(patch_size, output_size)
-    checkpoint = 'logs/MA_Detection/mlp_cls/exp1/epoch_261.pth'
+    
+    model = THCModel()
+    print(model)
+    checkpoint = 'logs/MA_Detection/res_cls/56patch_test/epoch_0.pth'
     model.load_state_dict(torch.load(checkpoint))
     
-    save_dir = 'dependencies/libraries/post_process/mlp/output/res50_dcn_cabm'
+    # 二阶段后处理json文件保存路径
+    save_dir = 'fortest/post'
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
-    result_dir = "logs/MA_Detection/hyh_ma_det_exp006/res50_cbam_dcn/model_eval_0.2_0.4_asd/result"
+    #指向一阶段模型验证后输出的json文件目录路径
+    json_dir = "fortest/result"
     
     data_dir = '/home/hyh/Documents/quanyi/project/Data/e_optha_MA/MA_ex'
     dataset_cfg = DatasetBase_("VOC").voc_dict
-    data_dir = os.path.join(data_dir, dataset_cfg['Image_Dir'])
+    image_dir = os.path.join(data_dir, dataset_cfg['Image_Dir'])
     
     transform = transforms.Compose([
         transforms.ToTensor(),
     ])
     
     
-    pp = Stage2(data_dir, result_dir, save_dir, model, patch_size, transform)
+    pp = Stage2(image_dir, json_dir, save_dir, model, patch_size, transform)
     pp.forward()
 
 

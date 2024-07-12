@@ -8,6 +8,7 @@ mlp.egg-info/dependency_links.txt
 mlp.egg-info/top_level.txt
 model/__init__.py
 model/mlp_model.py
+model/resnet_cbam.py
 plugins/Attention.py
 plugins/HWD.py
 plugins/KAN.py
