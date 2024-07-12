@@ -76,6 +76,7 @@ class MAPatchDataset():
         self.dataset_constructor.makedirs(self.dst_dir)
         data_set = self.gip.cut_image(self.source_path["Image_Dir"],  self.source_path["Annotation_Txt_Dir"], \
                                         self.patch_size, self.overlap, [[self.ma_filter,()]])
+        self.cal_img_info(data_set)
         self.save(data_set)
         train_set,test_set = self.data_split(data_set, "image", self.split_index)
         self.dataset_constructor.txt2voc(self.dst_path["Annotation_Txt_Dir"], self.dst_path["Annotation_Dir"], ("MA",))
@@ -130,6 +131,24 @@ class MAPatchDataset():
             
             with open(txt_path,"w") as f:
                 f.writelines([ i+" " for i in txt_data])
+                
+    def cal_img_info(self, data_set):
+        print('*'*10 + f"calculating means and vars for dataset"+'*'*10)
+        means = []
+        std_devs = []
+        for d in tqdm(data_set,colour='green'):
+            img = d["image"]["origin"]
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            mean, std_dev = self.gip.cal_mean_var(img)
+            means.append(mean)
+            std_devs.append(std_dev)
+        all_mean = np.mean(means, axis=0)
+        all_var = np.mean(std_devs, axis=0)
+        save_path = os.path.join(self.dst_dir, "info.txt")
+        with open(save_path, "w") as f:
+            f.writelines(f"means=[{all_mean[0]}, {all_mean[1]}, {all_mean[2]}]\n")
+            f.writelines(f"vars=[{all_var[0]}, {all_var[1]}, {all_var[2]}]")
+        
 
 
 class MergePatchDataset(MAPatchDataset):
@@ -150,6 +169,7 @@ class MergePatchDataset(MAPatchDataset):
         self.dataset_constructor.makedirs(self.dst_dir)
         data_set = self.mip.merge_image(self.source_path["Image_Dir"],  self.source_path["Annotation_Txt_Dir"], \
                                         self.patch_size, self.overlap, self.target_size, self.expend_index, [[self.ma_filter,()]])
+        self.cal_img_info(data_set)
         self.save(data_set)
         train_set,test_set = self.data_split(data_set, "image", self.split_index)
         self.dataset_constructor.txt2voc(self.dst_path["Annotation_Txt_Dir"], self.dst_path["Annotation_Dir"], ("MA",))
