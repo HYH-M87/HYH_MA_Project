@@ -77,7 +77,7 @@ class DataProcessBase_():
     
     def cal_mean_var(self, img:np.ndarray):
         '''
-        calculate the mean value and variance value of a batch of images
+        calculate the mean value and variance value of a  image
         '''
         image_float = img.astype(np.float32)
         mean, std_dev = cv2.meanStdDev(image_float)
@@ -159,4 +159,11 @@ class DataProcessBase_():
     def LPF(self, dft_shift, mask):
         return dft_shift * mask
     
-    
+    def crop_image(self, image, area, patch_size, if_pad=True):
+        x,y,x2,y2 = map(int, area)
+        cropped = image[y:y2, x:x2]
+        if if_pad:
+            cropped = self.resize_and_pad(cropped, patch_size)
+        else:
+            cropped = cv2.resize(cropped, patch_size)
+        return cropped

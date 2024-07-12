@@ -169,39 +169,6 @@ class GetImagePatch(DataProcessBase_):
             patch_lists = self.cut_patch(ip, ap, patch_size, overlap, screen_out)
             data_set.extend(patch_lists)
         return data_set
-    
-    # def crop_patch(self, image, boxes, size=None, if_contain=True):
-
-    #     for i, b in enumerate(boxes):
-    #         # 裁剪样本框
-    #         x, y, x2, y2, cls = map(int,b)
-    #         if size:
-                
-    #         cropped = image[y:y2, x:x2]
-            
-    #         # 调整大小
-    #         resized = cv2.resize(cropped, patch_size ,interpolation=cv2.INTER_CUBIC)
-            
-    #         name = source[:-4] + f"_patch{i}_cls{int(cls)}"
-    #         patch_lists.append(self.get_item(source, name, resized,["LTWHxywh",[[x, y, w, h, cls]]]))
-                
-
-    #     pass
-    
-    def crop_image(self, image_dir, annotation_dir, patch_size):
-        img_list=[]
-        annotation_list=[]
-        data_set=[]
-        
-        for i in os.listdir(image_dir):
-            img_list.append(os.path.join(image_dir,i))
-            annotation_list.append(os.path.join(annotation_dir,i[:-4]+".txt"))
-            
-        for index,(ip,ap) in enumerate(zip(img_list,annotation_list)):
-            patch_lists = self._crop(ip, ap, patch_size)
-            data_set.extend(patch_lists)        
-        pass
-
 class MergeImagePatch(GetImagePatch):
     def __init__(self, datastructure=patch_data) -> None:
         super().__init__(datastructure=datastructure)
