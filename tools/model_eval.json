@@ -1,0 +1,14 @@
+{
+    "MODE": "load",
+    "PRED": ["fortest/result"],
+    "DATADIR": "../Data/e_optha_MA/MA_ex/",
+    "PATCH_SIZE_H": 112,
+    "PATCH_SIZE_W": 112,
+    "OVERLAP_RATE": 0.1,
+    "SPLIT": 0.8,
+    "SCORE": 0.4,
+    "IOU": 0.2,
+    "SAVEDIR": "logs/MA_Detection/hyh_ma_det_exp006/res50_cbam",
+    "DESCRIPE": "test"
+  }
+  

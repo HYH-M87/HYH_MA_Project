@@ -1,0 +1,12 @@
+{
+    "ORI_DATA": "../Data/e_optha_MA/MA_ex/",
+    "PROCESSED_DATA": "../Data/e_optha_MA/ProcessedData",
+    "PATCH_SIZE_H": 56,
+    "PATCH_SIZE_W": 56,
+    "OVERLAP_RATE": 0.5,
+    "TARGET_SIZE_H": 112,
+    "TARGET_SIZE_W": 112,
+    "EXTEND": 1.0,
+    "SPLIT": 0.8,
+    "DESCRIPE": "description of the process"
+  }
