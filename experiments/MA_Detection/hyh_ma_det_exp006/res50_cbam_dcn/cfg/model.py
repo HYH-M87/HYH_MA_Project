@@ -9,8 +9,8 @@ custom_hooks = [dict(type="UnfreezeBackboneEpochBasedHook", unfreeze_epoch=14)]
 
 conv_cfg = dict(type='ConvWS')  # weight standrized
 norm_cfg = dict(type='GN', num_groups=32, requires_grad=True)  # group norm
-mean=[124.71244246624963,58.84973749888887,27.9093589403915]
-std=[11.127219388809989,7.2596578039624875,4.077963818254535]
+mean=[127.73050081368264,60.11144080495673,28.04235493486114]
+std=[17.101654550116056,8.684017171997453,4.707435310056902]
 
 
 # model settings

@@ -2,7 +2,7 @@
 
 # dataset settings
 dataset_type = 'VOCDataset'
-data_root = "../Data/e_optha_MA/ProcessedData/MAimages_CutPatch(112,112)_overlap50.0_ex"
+data_root = "../Data/e_optha_MA/ProcessedData/MAimages_MergePatch(56,56)_to_(112,112)_overlap50.0_ex"
 
 # Example to use different file client
 # Method 1: simply set the data root and let the file I/O module
