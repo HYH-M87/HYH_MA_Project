@@ -7,30 +7,29 @@ from typing import Union, Any
 import json
 from .._base_ import DataConstructor
 from .._base_ import DataProcessBase_
-'''
-进度：
-    数据保存:待完成
-    测试：待完成
-
-'''
-
-
-
+from .._base_ import NumpyDecoder
 
 class hard_sample(DataConstructor):
     def __init__(self) -> None:
         super().__init__()
+        self.imgdata_template = {
+            'origin': None,
+            'gray': None,
+            'frequency': None,
+            'HPF':None,
+            'LPF':None
+        }
         self.annotation_template = {'hard_sample': None}
         self._re_construct()
 
 
 class HardSampleAnalysis(DataProcessBase_):
-    def __init__(self, dataset_cfg:dict, result_dir:str, save_dir:str) -> None:
+    def __init__(self, dataset_cfg:dict, json_dir:str, save_dir:str) -> None:
         super().__init__()
         self.dataconstructor = hard_sample()
         self.dataset_cfg = dataset_cfg
         self.data_path = dataset_cfg['dst_path']
-        self.result_dir = result_dir
+        self.json_dir = json_dir
         self.save_dir = save_dir
 
     def forward(self):
@@ -38,55 +37,44 @@ class HardSampleAnalysis(DataProcessBase_):
         self.analysis(hardsample_lists)
         self.save_instance_png(hardsample_lists)
         
-    def analysis(self, instances, gray:bool=True, rgb:bool=True, fft:bool=True):
+    def analysis(self, instances):
         for i in instances:
+            # 创建每个实例的保存目录
             if self.save_dir:
                 save_path = os.path.join(self.save_dir, i['name'])
+                os.makedirs(save_path)
                 
             img = i['image']['origin']
+
+            self.togray(i, img)    
             
-            if gray:
-                self.togray(i, img)    
-            if rgb:
-                self.RGB_DataStatics(i, img)
-            if fft:
-                r,g,b = cv2.split(img)
-                self.fft_DataStatics(i, 0.1*r+0.8*g+0.1*b)
+            self.RGB_DataStatics(i, img)
+            
+            self.fft_DataStatics(i, self.gray_img(img))
         
 
-    def extract_hardsample(self, patch_size=None):
-        '''
-        impor 
-        读入json
-        筛选hard-sample
-        提取数据，patchsize，img_name，offset，hard-sample，对应的gt，iou，score
-        构建数据
-        返回数据列表
-        '''
+    def extract_hardsample(self):
+        # 构建hard sample 数据列表
         sample_lists=[]
-        files = [os.path.join(self.result_dir,i) for i in os.listdir(self.result_dir)]
+        files = [os.path.join(self.json_dir,i) for i in os.listdir(self.json_dir)]
         for file_path in files:
             with open(file_path, 'r') as file:
-                data = json.load(file)
-            hard_sample = data['hard_sample']
+                data = json.load(file, cls=NumpyDecoder)
+            hard_sample = data['annotation']['hard_sample']
             
-            if hard_sample is not None:
+            # 筛选出带有hard sample 的数据块，并构建数据列表
+            if hard_sample is not None and len(hard_sample) !=0 :
                 source = data['source']
                 offset = data['annotation']['offset']
                 classes = data['classes']
                 name = data['name']
                 x_s, y_s = offset[0], offset[1]
                 image = cv2.imread(os.path.join(self.data_path['Image_Dir'], source))
-                for gt,pred,iou in hard_sample:
-                    gt
-                if  patch_size:
-                    # Error
-                    annotation = data['annotation']['gt']
-                    annotation[:,0:4] += offset
-                    patch = self.cut_patche(image, annotation, patch_size)
-                else :
-                    patch_size = data['image']
-                    patch = image[y_s:y_s+patch_size[1], x_s:x_s+patch_size[0],:]
+                patch_size = data['image']
+                # 也可以使用self.cut_patch 进行裁剪
+                # bbox = data['annotation']['hard_sample'][0][0][0:4]
+                # patch = self.cut_patch(image, bbox+offset, 56)
+                patch = image[y_s:y_s+patch_size[1], x_s:x_s+patch_size[0],:]
                 
                 sample = self.dataconstructor.get_item(source, name, classes, {'origin':patch}, {'hard_sample':hard_sample})
                 sample_lists.append(sample)
@@ -94,8 +82,10 @@ class HardSampleAnalysis(DataProcessBase_):
         return sample_lists
     
     
-    def cut_patche(self, image, annotations, patch_size = 28):
-        
+    def cut_patch(self, image, annotations, patch_size = 28):
+        '''
+            通过hard sample bbox进行任意大小patch的裁剪
+        '''
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         (x1, y1, x2, y2, cls) = (annotations)
         center_x = (x1 + x2) // 2
@@ -111,10 +101,14 @@ class HardSampleAnalysis(DataProcessBase_):
             
 
     def togray(self, i:dict, img:np.ndarray):
+        '''
+        转灰度图
+        '''
         i['image']['gray'] = self.gray_img(img)
         
     def RGB_DataStatics(self, i, img):
         '''
+        统计RGB三通道的最大值，最小值，均值，标准差和直方图
         RGB :max, min, mean, std, histogram
         '''
         means, vars = self.cal_mean_var(img)
@@ -125,10 +119,14 @@ class HardSampleAnalysis(DataProcessBase_):
 
         for (t,max,min,mean,var,hist) in zip(types,maxs,mins,means,vars,hists):
             i['numerical'][t] = list((max,min,mean,var,hist))
-
-    def fft_DataStatics(self, i, img):
-        img_dft = self.dft(img, shift=False)
         
+    def fft_DataStatics(self, i, img):
+        '''
+        对图像进行高通滤波和低通滤波，并保存
+        '''
+        # 傅里叶变换
+        img_dft = self.dft(img, shift=False)
+        # 计算幅值，并做数值统计
         magnitude_spectrum = 20 * np.log(cv2.magnitude(img_dft[:,:,0], img_dft[:,:,1]))
         means, vars = self.cal_mean_var(magnitude_spectrum)
         mins, maxs = self.cal_min_max(magnitude_spectrum)
@@ -139,19 +137,22 @@ class HardSampleAnalysis(DataProcessBase_):
         v = np.fft.fftfreq(cols).reshape(1, -1)
         freq = np.sqrt(u**2 + v**2)
 
-        # Flatten the frequency and magnitude arrays
+        # 展平频率和幅值数据
         freq_flat = freq.flatten()
         magnitude_flat = magnitude_spectrum.flatten()
 
-        # Sort by frequency
+        # 将频率从小到大排序，并且幅值也按对于频率进行排序
         sorted_indices = np.argsort(freq_flat)
         i['numerical']['f'] = magnitude_flat[sorted_indices]
         
+        # 中心偏移
         img_dft  = np.fft.fftshift(img_dft)
         i['image']['frequency'] = np.uint8(cv2.normalize(cv2.magnitude(img_dft[:, :, 0], img_dft[:, :, 1]), None, 0, 255, cv2.NORM_MINMAX)) 
         
+        # 计算高低通掩膜
         low_mask, high_mask = self.dft_mask(img.shape, 0.95)
         
+        # 应用高低通滤波器
         def f_(img, mask=None):
             if mask is not None:
                 img = img * mask
@@ -160,6 +161,7 @@ class HardSampleAnalysis(DataProcessBase_):
             img = np.uint8(cv2.normalize(img, None, 0, 255, cv2.NORM_MINMAX))
             return img
         
+        # 保存
         hpf_img = f_(img_dft, high_mask)
         lpf_img = f_(img_dft, low_mask)
         i['image']['HPF'] = hpf_img
@@ -174,52 +176,28 @@ class HardSampleAnalysis(DataProcessBase_):
             annotations.append((x1, y1, x2, y2, cls))
         return annotations
 
-    def save_instance_scale(self):
-        
-        pass
-    
+
+
     def save_instance_png(self, instances):
+        '''
+            保存实例数据，每个图片patch为一个目录，其中保存其分析数据
+        '''
         for ins in instances:
-            image_num = len(ins['image'])
-            c = math.ceil(image_num / 2)
-            r = math.ceil(image_num / c)
-            
-            fig, axs = plt.subplots(r, c, figsize=(8, 16)) 
-            image_data = ins['image'].copy()
-            hard_samples=ins['annotation']['hard_sample']
-            
-            for i in range(r):
-                for j in range(c):
-                    
-                    image_data.popitem()
-                    
-                    
-                    
-                    if i*c+j < len(keys) :
-                        
-                        res_img = cv2.rectangle(ins['image'][keys[i*c+j]],pt1, pt2,(0,0,0),1)
-                        axs[i, j].imshow(res_img)
-                        axs[i, j].set_title(keys[i*c+j])
-                        
-                    if len(keys)  <= i*c+j < len(keys)+1:
-                        for color in ['r','g','b']: 
-                            hist = (ins['numerical'][color]['histogram']).reshape((-1,1))
-                            axs[i, j].plot(hist,color = color)
-                    if len(keys)+1  <= i*c+j < len(keys)+2:
-                        hist = (ins['numerical']['fft_all']['histogram']).reshape((-1,1))
-                        axs[i, j].plot(hist,color = 'r')
-                        
-            plt.tight_layout()
-            plt.savefig(os.path.join(self.save,ins["source"]+ins["name"]+".png"))
-            # plt.show()
-            plt.clf()
-            plt.close()
+            # for image data
+            name = ins['name']
+            boxes = ins['annotation']['hard_sample']
+            for k,img in ins['image'].items():
+                save_path = os.path.join(self.save_dir, name, k+'.jpg')
+                for b in boxes:
+                    x,y,x2,y2 = map(int, b[0])
+                    cv2.imwrite(save_path, img)
+                    img = cv2.rectangle(img, (x,y), (x2,y2), (255,0,0),1)
+                    cv2.imwrite(save_path, img)
 
 
 
-# 测试函数
 if __name__ == "__main__":
-
+    # for debug
     # 设置图像和注释文件所在的目录
     image_directory = 'test/hard_sample_res/img'
     annotation_directory = 'test/hard_sample_res/txt'
