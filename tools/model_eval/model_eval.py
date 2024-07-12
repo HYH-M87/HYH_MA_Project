@@ -9,7 +9,7 @@ import os
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Cut patch from Image')
-    parser.add_argument('mode', action='store', help='the name of original dataset')
+    parser.add_argument('mode', action='store', help='the mode to ger pedcidt result set to "model" or "load" ')
     parser.add_argument('pred', action='store', nargs='+', help='if mode is "model" it will receive two prarams, checkpoint and model cfg, respectively.')
     parser.add_argument('data_dir', action='store', help='the name of original dataset')
     parser.add_argument('patch_size', type=int, action='store', nargs=2, help='the size of a patch')
