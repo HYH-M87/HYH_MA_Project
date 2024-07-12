@@ -1,0 +1,11 @@
+{
+    "DATADIR": "../Data/e_optha_MA/MA_ex/",
+    "JSONDIR": "fortest/result",
+    "PATCH_SIZE_H": 112,
+    "PATCH_SIZE_W": 112,
+    "OVERLAP_RATE": 0.1,
+    "SPLIT": 0.8,
+    "SAVEDIR": "fortest/hard",
+    "DESCRIPE": "test"
+  }
+  
