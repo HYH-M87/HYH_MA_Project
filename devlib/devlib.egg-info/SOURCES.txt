@@ -3,6 +3,8 @@ _base_/DataBase.py
 _base_/DataProcessBase.py
 _base_/DatasetConstruct.py
 _base_/__init__.py
+analyze_data/HardSample.py
+analyze_data/__init__.py
 dataset/__init__.py
 dataset/ma_patch.py
 devlib.egg-info/PKG-INFO
