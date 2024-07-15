@@ -16,6 +16,11 @@ import gc
 #     pass
 
 class patch_data(DataConstructor):
+    '''
+    构建数据格式：
+        用于构建patch数据集，故只需要原图像数据和标签数据
+    
+    '''
     def __init__(self) -> None:
         super().__init__()
         self.numerical_data_template = None
@@ -69,6 +74,8 @@ class GetImagePatch(DataProcessBase_):
         
         image = cv2.imread(image_path)
         box_data = []
+        # 若数据及中包括完全健康的眼底图像，需要进行判断
+        # 对该数据实例是否存在annotation file，即可判断其是否为完全健康的眼底图像
         if annotation_path:
             with open(annotation_path,"r") as f:
                 box_data = np.array(f.read().split(),dtype=int)
@@ -157,7 +164,7 @@ class GetImagePatch(DataProcessBase_):
             img_list.append(os.path.join(image_dir,i))
             annotation_list.append(os.path.join(annotation_dir,i[:-4]+".txt"))
             
-        # 数据集构建Sp
+        # 数据集构建
         data_set=[]
         print('*'*10+'cut patches'+'*'*10)
         for index,(ip,ap) in tqdm(enumerate(zip(img_list,annotation_list)),colour='green'):
@@ -165,7 +172,7 @@ class GetImagePatch(DataProcessBase_):
             # if index > 3:
             #     break
             
-            # 图片裁剪
+            # 图片裁剪，返回所有裁剪出的patch
             patch_lists = self.cut_patch(ip, ap, patch_size, overlap, screen_out)
             data_set.extend(patch_lists)
         return data_set
@@ -193,7 +200,7 @@ class MergeImagePatch(GetImagePatch):
 
         # 构建candidates
         '''
-        warning: 这种方式在进行非单张图的merge时，也即patch_lists很大，可能会导致内存占用过大，可以采取
+        TODO: 这种方式在进行非单张图的merge时，也即patch_lists很大，可能会导致内存占用过大，可以采取
                     边拼接边shuffle的方式，不进行candidates的构建吗，对于patch_lists，依次取样拼接，当索引超出时，将其shuffle再从头采样
         有空改一下
         '''

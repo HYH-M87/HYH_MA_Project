@@ -12,6 +12,10 @@ from ..process_data import GetImagePatch
 from .._base_ import DatasetConstructor, NumpyEncoder, NumpyDecoder
 
 class eval_data(DataConstructor):
+    '''
+    用于模型验证的数据结构
+    
+    '''
     def __init__(self) -> None:
         super().__init__()
         self.annotation_template = {'type':None, 'gt':None, 'pred':None, 'hard_sample':None, 'score':None, 'label':None, 'iou':None, 'offset':None}

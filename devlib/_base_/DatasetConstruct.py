@@ -11,14 +11,27 @@ import cv2
 
 class DatasetConstructor(DatasetBase_):
     def __init__(self, Cfg:Union[str, dict], **kwargs) -> None:
+        '''
+        数据集构建
+        初始化参数：
+            Cfg:     传入字符串['VOC', ]，表示使用已定义的数据集格式例如“VOC”否则传入自定义配置文（dict）
+            **kwargs 可针对特殊数据集添加新的路径信息
+            
+        example：
+            # 传入额外路径
+            my_dataset = DatasetConstructor('VOC', {'additional_path': Path})
+            
+        '''
         super().__init__(Cfg)
         if len(kwargs) != 0:
             self.add_(kwargs)
-        
+            
+    # 添加额外路径
     def add_(self, more_dir:dict):
         for k,v in more_dir.items():
             self.data_path_cfg[k] = v
-        
+            
+    # 构建目录
     def makedirs(self, name:str):
         '''
         param: 
@@ -32,7 +45,8 @@ class DatasetConstructor(DatasetBase_):
                     print(f'make : {os.path.join(name,v)}')
         else:
             print('dataset has already existed')
-
+            
+    # 获取该数据集的所有路径信息
     def get_path(self, name):
 
         path_dict = copy.deepcopy(self.data_path_cfg)
@@ -50,7 +64,7 @@ class DatasetConstructor(DatasetBase_):
     
     def generate_txt(self):
         pass
-    
+
     def txt2voc(self, txt_dir:str ,xml_dir:str ,cn:tuple) -> None:
         '''
         convert the txt file to VOC Dataset xml file;
