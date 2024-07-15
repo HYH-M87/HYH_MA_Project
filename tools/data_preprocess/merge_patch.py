@@ -24,7 +24,7 @@ def main():
     target_size = args.target_size
     extend_index = args.extend_index
     overlap = args.overlap_rate
-    dataset_name = "MAimages_CutPatch({},{})_overlap{}_{}".format(patch_size[0],patch_size[1],overlap*100,args.descripe)
+    dataset_name = "MAimages_MergePatch({},{}to{},{})_overlap{}_ext_{}_{}".format(patch_size[0],patch_size[1],target_size[0],target_size[1],overlap*100, extend_index, args.descripe)
     ProcessedData_path= os.path.join(args.out_dir, dataset_name)
     ma_patch = MergePatchDataset(args.data_dir, ProcessedData_path, patch_size, overlap, target_size, extend_index, "image", args.split)
     # ma_patch = MergePatchDataset("/home/hyh/Documents/quanyi/project/Data/e_optha_MA/MA","/home/hyh/Documents/quanyi/project/Data/e_optha_MA/Test_merge",[56,56],0.5,[112,112],1,"image",0.8)
