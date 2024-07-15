@@ -18,11 +18,14 @@ output_size = 2
 learning_rate = 0.0001
 num_epochs = 300
 batch_size = 32
+log_dir = "logs/MA_Detection/classification/THC/patch_56"
+data_dir = '/home/hyh/Documents/quanyi/project/Data/e_optha_MA/extract_sample_test'
+checkpoint="logs/MA_Detection/classification/THC/patch_56/epoch_118.pth"
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-log_dir = "logs/MA_Detection/res_cls/56patch_test"
+
 if not os.path.exists(log_dir):
     os.makedirs(log_dir)
-    
 log_path = os.path.join(log_dir,'log.txt')
 writer = SummaryWriter(log_dir=os.path.join(log_dir,'tf'))
 
@@ -31,7 +34,7 @@ transform = transforms.Compose([
     transforms.ToTensor()
 ])
 
-data_dir = '/home/hyh/Documents/quanyi/project/Data/e_optha_MA/extract_sample_test'
+
 train_dataset = MA_patch(data_dir,True,transform)
 test_dataset = MA_patch(data_dir,False,transform)
 train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
@@ -41,7 +44,7 @@ test_loader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=Fa
 model = THCModel()
 print(model)
 start=0
-checkpoint="logs/MA_Detection/res_cls/112patch/0.pth"
+
 if os.path.exists(checkpoint):
     model.load_state_dict(torch.load(checkpoint))
     start = int(os.path.split(checkpoint)[-1][6:-4])+1

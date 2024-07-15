@@ -119,24 +119,24 @@ class Stage2():
 def main():
     # args = parse_args()
     
-    patch_size = [56,56] # 输入层大小
-    inchanel = 3
-    output_size = 2  
-    
-    model = THCModel()
-    print(model)
+    # 输入大小
+    patch_size = [56,56] 
+    # 模型文件
     checkpoint = 'logs/MA_Detection/res_cls/56patch_test/epoch_0.pth'
-    model.load_state_dict(torch.load(checkpoint))
-    
     # 二阶段后处理json文件保存路径
     save_dir = 'fortest/post'
+    # 指向一阶段模型验证后输出的json文件目录路径
+    json_dir = "fortest/result"
+    # 原MA数据集文件
+    data_dir = '/home/hyh/Documents/quanyi/project/Data/e_optha_MA/MA_ex'
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
-
-    #指向一阶段模型验证后输出的json文件目录路径
-    json_dir = "fortest/result"
+        
+    model = THCModel()
+    print(model)
+    model.load_state_dict(torch.load(checkpoint))
     
-    data_dir = '/home/hyh/Documents/quanyi/project/Data/e_optha_MA/MA_ex'
+    
     dataset_cfg = DatasetBase_("VOC").voc_dict
     image_dir = os.path.join(data_dir, dataset_cfg['Image_Dir'])
     
