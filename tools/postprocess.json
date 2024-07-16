@@ -1,0 +1,11 @@
+{
+    "CHECKPOINT": "logs/MA_Detection/classification/THC/patch_56/epoch_17.pth",
+    "JSONDIR": "/home/hyh/Documents/quanyi/project/MA_Project/fortest/test/model_eval_0.2_0.5_test/result",
+    "DATADIR": "../Data/e_optha_MA/MA_ex/",
+    "FMASKDIR": "/home/hyh/Documents/quanyi/project/Data/e_optha_MA/MA_mask",
+    "VMASKDIR":"/home/hyh/Documents/quanyi/project/Data/e_optha_MA/vessel_mask",
+    "PATCH_SIZE_H": 56,
+    "PATCH_SIZE_W": 56,
+    "SAVEDIR": "fortest/post",
+    "DESCRIPE": "post"
+  }

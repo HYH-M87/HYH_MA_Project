@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+
+# 读取配置文件
+CONFIG_FILE=$1
+
+CHECKPOINT=$(jq -r '.CHECKPOINT' $CONFIG_FILE)
+JSONDIR=$(jq -r '.JSONDIR' $CONFIG_FILE)
+DATADIR=$(jq -r '.DATADIR' $CONFIG_FILE)
+FMASKDIR=$(jq -r '.FMASKDIR' $CONFIG_FILE)
+VMASKDIR=$(jq -r '.VMASKDIR' $CONFIG_FILE)
+PATCH_SIZE_H=$(jq -r '.PATCH_SIZE_H' $CONFIG_FILE)
+PATCH_SIZE_W=$(jq -r '.PATCH_SIZE_W' $CONFIG_FILE)
+SAVEDIR=$(jq -r '.SAVEDIR' $CONFIG_FILE)
+DESCRIPE=$(jq -r '.DESCRIPE' $CONFIG_FILE)
+
+
+PYTHONPATH="$(dirname $0)/..":$PYTHONPATH \
+python $(dirname "$0")/post_process/postprocess.py \
+  $CHECKPOINT \
+  $JSONDIR \
+  $DATADIR \
+  $FMASKDIR \
+  $VMASKDIR \
+  $PATCH_SIZE_H \
+  $PATCH_SIZE_W \
+  $SAVEDIR \
+  --descripe $DESCRIPE
