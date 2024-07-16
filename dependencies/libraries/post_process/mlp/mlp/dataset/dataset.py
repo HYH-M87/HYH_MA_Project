@@ -19,7 +19,7 @@ class Generate():
         
 
     # TODO: 对训练集用一阶段的模型预测后的json文件作为构建数据集的依据，可能更有针对性，效果更好 
-    def load_json():
+    def load_json_instances():
         '''
         instances = []
         
@@ -43,31 +43,37 @@ class Generate():
         # 构建实例列表
         instances=[]
         
-        # 从原数据集获取数据
+        # 从原数据集获取训练集/测试集数据
         with open(self.source_data_path["TrainSet_Path"], 'r') as f:
             train_data_lists = f.read().splitlines()
             
         with open(self.source_data_path["TestSet_Path"], 'r') as f:
             test_data_lists = (f.read().splitlines())
-            
+        # 打包
         data_dict = {'trainval.txt':train_data_lists, 'test.txt':test_data_lists}
         
         for k,v in data_dict.items():
             dataset_f = open(os.path.join(self.dst_data_path["ImageSets_Dir"],k), 'w')
             for d in v:
+                # 读取图像
                 img_path = os.path.join(self.source_data_path["Image_Dir"], d+".jpg")
                 image = cv2.imread(img_path)
-                
+                # 读取标签txt文件
                 txt_path = os.path.join(self.source_data_path["Annotation_Txt_Dir"], d+".txt")
                 with open(txt_path,"r") as f:
                     boxes = np.array(f.readline().split()).reshape((-1,5))
                     
+                # txt文件中每个box保存为一个实例
                 for i, b in enumerate(boxes):
+                    # 取其类别index
                     cls = b[-1]
                     # 对裁剪的图片resize, 按比例，0填充
                     croped = DataProcessBase_().crop_image(image, b[0:4], self.patch_size)
+                    # 构造实例名称
                     name = d+f"_{i}"
+                    # 写入数据集文件
                     dataset_f.write(name+'\n')
+                    # 添加实例到列表
                     instances.append([croped, cls, name])
             dataset_f.close()
 
